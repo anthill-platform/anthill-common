@@ -4,7 +4,7 @@ import tornado.ioloop
 import handler
 import access
 import jsonrpc
-import json
+import ujson
 import logging
 
 from tornado.gen import coroutine, Return
@@ -192,7 +192,7 @@ class AdminHandler(handler.AuthenticatedHandler):
             self.write("Need to authorize.")
             return
 
-        self.action.context = json.loads(self.get_argument("context"))
+        self.action.context = ujson.loads(self.get_argument("context"))
 
         try:
             data = yield self.action.get(**self.action.context)
@@ -219,7 +219,7 @@ class AdminHandler(handler.AuthenticatedHandler):
         else:
             result = self.action.render(data)
 
-        self.write(json.dumps(result))
+        self.dumps(result)
 
     def get_action(self, action_id):
         action_class = self.actions.action(action_id)
@@ -243,8 +243,8 @@ class AdminHandler(handler.AuthenticatedHandler):
             return
 
         try:
-            self.action.context = json.loads(self.get_argument("context"))
-            data = json.loads(self.get_argument("data"))
+            self.action.context = ujson.loads(self.get_argument("context"))
+            data = ujson.loads(self.get_argument("data"))
         except (KeyError, ValueError):
             raise HTTPError(400, "Bad request")
 
@@ -275,7 +275,7 @@ class AdminHandler(handler.AuthenticatedHandler):
         else:
             result = self.action.render(data)
 
-        self.write(json.dumps(result))
+        self.dumps(result)
 
     @coroutine
     def prepare(self):
@@ -293,7 +293,7 @@ class AdminMetadataHandler(handler.AuthenticatedHandler):
         if not self.application.metadata:
             raise HTTPError(404, "No metadata")
 
-        self.write(json.dumps(self.application.metadata))
+        self.dumps(self.application.metadata)
 
 
 class AdminWSActionConnection(handler.AuthenticatedWSHandler):
@@ -364,7 +364,7 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
             self.write("Need to authorize.")
             return
 
-        self.action.context = json.loads(self.get_argument("context"))
+        self.action.context = ujson.loads(self.get_argument("context"))
 
         try:
             yield self.action.prepared(**self.action.context)
@@ -379,7 +379,7 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
             }
 
             self.set_status(REDIRECT, "Redirect-To")
-            self.write(json.dumps(result))
+            self.dumps(result)
             self.finish()
         except ActionError as e:
             raise HTTPError(400, e.title)

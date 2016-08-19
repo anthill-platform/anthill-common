@@ -12,6 +12,21 @@ from tornado.web import HTTPError, RequestHandler
 
 import access
 import internal
+import ujson
+
+
+class JsonHandlerMixin(object):
+    # noinspection PyUnresolvedReferences
+    def dumps(self, data):
+        if not isinstance(data, (list, dict)):
+            raise ValueError("Not a json object")
+
+        self.set_header("Content-Type", "application/json")
+        self.write(ujson.dumps(data, ensure_ascii=False, escape_forward_slashes=False))
+
+
+class JsonHandler(JsonHandlerMixin, RequestHandler):
+    pass
 
 
 class AuthCallbackHandler(RequestHandler):
@@ -75,6 +90,7 @@ class AuthCallbackHandler(RequestHandler):
             })
 
 
+# noinspection PyUnresolvedReferences
 class AuthenticatedHandlerMixin(object):
     def __init__(self, application):
         self.token = None
@@ -230,7 +246,7 @@ class AuthenticatedHandlerMixin(object):
         return None
 
 
-class AuthenticatedHandler(AuthenticatedHandlerMixin, RequestHandler):
+class AuthenticatedHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, RequestHandler):
     """
     A handler that deals with access tokens internally. Parses and validates access_token field,
     if passed, and makes possible to reference token object by self.token
@@ -251,7 +267,7 @@ class AuthorizedUser:
         self.profile = None
 
 
-class AuthenticatedWSHandler(AuthenticatedHandlerMixin, tornado.websocket.WebSocketHandler):
+class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornado.websocket.WebSocketHandler):
     """
     A handler like the one above, but used for the web sockets
     """
