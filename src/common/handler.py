@@ -121,7 +121,7 @@ class AuthenticatedHandlerMixin(object):
         args = {
             "scopes": ",".join(set(needed_scopes)),
             "gamespace": self.get_gamespace(),
-            "redirect": self.application.get_host() + "/authcallback?" + urllib.urlencode({
+            "redirect": self.application.get_host() + "/callback?" + urllib.urlencode({
                 "after": self.request.uri
             }),
             "as": (self.authorize_as() or "")
