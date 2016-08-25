@@ -238,6 +238,7 @@ class Server(tornado.web.Application):
             http_server.listen(int(port), "127.0.0.1")
 
         def listen_unix(sock):
+            logging.info("Listening for socket: " + sock)
             unix_socket = tornado.netutil.bind_unix_socket(sock, mode=0o777)
             http_server.add_socket(unix_socket)
 

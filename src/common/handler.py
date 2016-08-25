@@ -22,7 +22,7 @@ class JsonHandlerMixin(object):
             raise ValueError("Not a json object")
 
         self.set_header("Content-Type", "application/json")
-        self.write(ujson.dumps(data, ensure_ascii=False, escape_forward_slashes=False))
+        self.write(ujson.dumps(data, escape_forward_slashes=False))
 
 
 class JsonHandler(JsonHandlerMixin, RequestHandler):
