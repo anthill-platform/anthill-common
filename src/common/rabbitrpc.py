@@ -106,6 +106,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
             try:
                 payload["id"] = int(properties.correlation_id or "-1")
             except ValueError:
+                logging.error("Bad correlation id received: " + str(properties.correlation_id))
                 # ignore that message
                 return
 
@@ -172,8 +173,12 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         routing_key = context.routing_key()
         reply_to = context.reply_to()
 
+        correlation_id = payload.get("id", None)
+        if correlation_id:
+            correlation_id = str(correlation_id)
+
         properties = pika.BasicProperties(
-            correlation_id=str(payload.get("id", None)),
+            correlation_id=correlation_id,
             reply_to=str(reply_to)
         )
 

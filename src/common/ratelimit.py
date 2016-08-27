@@ -4,6 +4,7 @@ from common.options import options
 
 import common.keyvalue
 
+
 class RateLimit(object):
     """
     Limits allowed amount of certain actions for an account

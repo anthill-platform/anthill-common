@@ -23,9 +23,14 @@ INVALID_TTL = 30
 
 
 def parse_account(source):
+
+    if len(source) > 255:
+        return None
+
     c = re.match(ACCOUNT_PATTERN, source)
     if c:
         return [c.group(1), c.group(2)]
+
     return None
 
 

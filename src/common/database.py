@@ -6,6 +6,7 @@ import tormysql.cursor
 
 # noinspection PyUnresolvedReferences
 from pymysql import DatabaseError as DatabaseError
+from pymysql import OperationalError as ConnectionError
 from pymysql import IntegrityError as DuplicateError
 from pymysql import IntegrityError as ConstraintsError
 
@@ -111,7 +112,8 @@ class Database(object):
             cursorclass=tormysql.cursor.DictCursor,
             autocommit=True,
             use_unicode=True,
-            charset="utf8"
+            charset="utf8",
+            **kwargs
         )
 
     @coroutine

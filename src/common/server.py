@@ -20,12 +20,15 @@ import admin
 import jsonrpc
 import handler
 import traceback
+import time
+import signal
 
 # just included to define things
 import options.default as opts_
 
 from . import retry, ElapsedTime
 
+MAX_WAIT_SECONDS_BEFORE_SHUTDOWN = 5
 
 SERVICE_VERSION = "0.1"
 tornado.netutil.Resolver.configure('tornado.netutil.ThreadedResolver')
@@ -42,6 +45,9 @@ class ServerError(RuntimeError):
 
 class Server(tornado.web.Application):
     def __init__(self):
+
+        self.http_server = None
+
         self.api_version = SERVICE_VERSION
 
         handlers = self.get_handlers() or []
@@ -223,8 +229,10 @@ class Server(tornado.web.Application):
         logging.info("Service '%s' started.", self.name)
 
     def run(self):
+        signal.signal(signal.SIGTERM, self.__sig_handler__)
+        signal.signal(signal.SIGINT, self.__sig_handler__)
 
-        http_server = tornado.httpserver.HTTPServer(self, xheaders=True)
+        self.http_server = tornado.httpserver.HTTPServer(self, xheaders=True)
 
         listen_uri = options.listen
         listen_group = listen_uri.split(":")
@@ -235,12 +243,12 @@ class Server(tornado.web.Application):
         kind, address = listen_group[0], listen_group[1]
 
         def listen_port(port):
-            http_server.listen(int(port), "127.0.0.1")
+            self.http_server.listen(int(port), "127.0.0.1")
 
         def listen_unix(sock):
             logging.info("Listening for socket: " + sock)
             unix_socket = tornado.netutil.bind_unix_socket(sock, mode=0o777)
-            http_server.add_socket(unix_socket)
+            self.http_server.add_socket(unix_socket)
 
         kinds = {
             "port": listen_port,
@@ -283,6 +291,34 @@ class Server(tornado.web.Application):
 
         else:
             raise jsonrpc.JsonRPCError(-32600, "No such method")
+
+    def __sig_handler__(self, sig, frame):
+        logging.warning('Caught signal: %s', sig)
+        tornado.ioloop.IOLoop.instance().add_callback(self.shutdown)
+
+    def shutdown(self):
+        logging.info('Stopping server!')
+        self.http_server.stop()
+
+        for model in self.get_models():
+            if hasattr(model, "stopped"):
+                tornado.ioloop.IOLoop.instance().add_callback(model.stopped)
+
+        logging.info('Will shutdown in %s seconds ...', MAX_WAIT_SECONDS_BEFORE_SHUTDOWN)
+        io_loop = tornado.ioloop.IOLoop.instance()
+
+        deadline = time.time() + MAX_WAIT_SECONDS_BEFORE_SHUTDOWN
+
+        # noinspection PyProtectedMember
+        def stop_loop():
+            now = time.time()
+            if now < deadline and (io_loop._callbacks or io_loop._timeouts):
+                io_loop.add_timeout(now + 1, stop_loop)
+            else:
+                io_loop.stop()
+                logging.info('Stopped!')
+
+        stop_loop()
 
 
 def init():
