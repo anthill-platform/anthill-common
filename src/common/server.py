@@ -281,7 +281,7 @@ class Server(tornado.web.Application):
             try:
                 result = yield getattr(self.internal_handler, method)(*args, **kwargs)
             except internal.InternalError as e:
-                raise jsonrpc.JsonRPCError(-32603, e.body, "code: " + str(e.code))
+                raise jsonrpc.JsonRPCError(e.code, e.body, "code: " + str(e.code))
             except Exception:
                 raise jsonrpc.JsonRPCError(-32603, traceback.format_exc())
             else:
