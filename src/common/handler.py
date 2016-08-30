@@ -12,6 +12,7 @@ from tornado.web import HTTPError, RequestHandler
 
 import access
 import internal
+import jsonrpc
 import ujson
 
 
@@ -299,6 +300,57 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornad
         Empty list means no restriction is required.
         """
         return []
+
+
+class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
+
+    """
+    Authenticated web socket handler, but with JSONRPC protocol.
+    Allows to setup JSONRPC communication with client. Please see http://www.jsonrpc.org/specification for detail.
+
+    To send an rpc command (without expecting a response), call yield self.rpc(self, 'methid', .. arguments ..)
+    To send a request command (with response), call yield self.request(self, 'methid', .. arguments ..),
+        the result of such instruction is a response from a client, or JsonRPCTimeout exception.
+
+    To receive a command, just define appropriate method in a subclass:
+
+    @coroutine
+    def hello(name):
+        raise Return("Hello, your name is " + name)
+
+    To deny a method from calling, start if with underscore.
+
+    """
+
+    def __init__(self, application, request, **kwargs):
+        AuthenticatedWSHandler.__init__(self, application, request, **kwargs)
+        jsonrpc.JsonRPC.__init__(self)
+
+        self.set_receive(self.command_received)
+
+    @coroutine
+    def command_received(self, context, action, *args, **kwargs):
+        if hasattr(self, action):
+            if action.startswith("_"):
+                raise HTTPError(400, "Actions starting with underscore are not allowed!")
+
+            try:
+                response = yield getattr(self, action)(*args, **kwargs)
+            except TypeError as e:
+                raise jsonrpc.JsonRPCError(400, "Bad arguments: " + e.args[0])
+            except Exception as e:
+                raise jsonrpc.JsonRPCError(500, "Error: " + e.args[0])
+
+            raise Return(response)
+
+    @coroutine
+    def on_message(self, message):
+        yield self.received(self, message)
+
+    # noinspection PyMethodOverriding
+    @coroutine
+    def write(self, context, data):
+        yield self.write_message(data)
 
 
 class CookieAuthenticatedHandler(AuthenticatedHandler):
