@@ -244,13 +244,13 @@ class JsonRPC(object):
         self.on_receive = handler
 
     @coroutine
-    def write(self, context, data):
+    def write_data(self, context, data):
         raise NotImplementedError()
 
     @coroutine
     def write_object(self, context, data, **payload):
         data.update(payload)
-        yield self.write(context, ujson.dumps(data))
+        yield self.write_data(context, ujson.dumps(data))
 
 
 class JsonRPCError(Exception):

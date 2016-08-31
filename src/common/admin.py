@@ -470,7 +470,7 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
         return []
 
     @coroutine
-    def write(self, context, data):
+    def write_data(self, context, data):
         yield self.handler.write_message(data)
 
 

@@ -57,7 +57,7 @@ class ZMQInterProcess(JsonRPC):
         self.__post_init__()
 
     @coroutine
-    def write(self, context, data):
+    def write_data(self, context, data):
         logging.debug("Sending: " + data)
         yield Task(self.stream.send, data)
 

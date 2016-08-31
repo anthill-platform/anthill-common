@@ -349,7 +349,7 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
 
     # noinspection PyMethodOverriding
     @coroutine
-    def write(self, context, data):
+    def write_data(self, context, data):
         yield self.write_message(data)
 
 
