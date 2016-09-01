@@ -134,7 +134,9 @@ def to_int(value):
 
 def update(d, u):
     for k, v in u.iteritems():
-        if isinstance(v, collections.Mapping):
+        if v is None:
+            d.pop(k)
+        elif isinstance(v, collections.Mapping):
             r = update(d.get(k, {}), v)
             d[k] = r
         else:
