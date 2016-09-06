@@ -155,4 +155,4 @@ class ElapsedTime(object):
 
     def done(self):
         elapsed_time = time.time() - self.start_time
-        logging.info('[{}] finished in {} ms'.format(self.name, int(elapsed_time * 1000)))
+        return '[{}] finished in {} ms'.format(self.name, int(elapsed_time * 1000))

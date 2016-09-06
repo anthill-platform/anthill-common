@@ -19,9 +19,6 @@ import ujson
 class JsonHandlerMixin(object):
     # noinspection PyUnresolvedReferences
     def dumps(self, data):
-        if not isinstance(data, (list, dict)):
-            raise ValueError("Not a json object")
-
         self.set_header("Content-Type", "application/json")
         self.write(ujson.dumps(data, escape_forward_slashes=False))
 

@@ -71,7 +71,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
             raise InternalError(599, "Connection error: " + e.message, None)
 
         finally:
-            timer.done()
+            logging.info(timer.done())
 
         raise Return(Internal.__parse_result__(result, use_json=use_json))
 
@@ -141,7 +141,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         except socket.error as e:
             raise InternalError(599, "Connection error: " + e.message, None)
         finally:
-            timer.done()
+            logging.info(timer.done())
 
         raise Return(Internal.__parse_result__(result, use_json=use_json))
 
@@ -179,7 +179,8 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
             raise InternalError(e.code, e.message, e.data)
         except jsonrpc.JsonRPCTimeout:
             raise InternalError(599, "Timed out for request {0}@{1}".format(method, service))
-        timer.done()
+        logging.info(timer.done())
+
         raise Return(result)
 
     @coroutine

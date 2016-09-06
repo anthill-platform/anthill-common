@@ -478,6 +478,12 @@ def link(url, title, icon=None, badge=None, **context):
     """
     A single link (usually used in a bundle with 'links' method.
     :param url: An action this link leads to. 'account', 'event' etc
+
+                If the url starts with a slash, an looks like this: /aaa/bbb, then this link will lead to
+                action <bbb> of the service <aaa>.
+
+                Absolute external http(s) links also allowed.
+
     :param title: Link's title
     :param icon: (optional) An icon next to the link (font-awesome)
     :param badge: (optional) A small badge next to the link, like: See this(github)
@@ -486,6 +492,8 @@ def link(url, title, icon=None, badge=None, **context):
     link("account", "John's account", icon="account", account=5)
     link("index", "Home page")
     link("profile", "See profile", badge="profile", account=14)
+    link("/environment/test", "See profile at 'environment'", badge="profile", account=14)
+
     """
 
     return {
