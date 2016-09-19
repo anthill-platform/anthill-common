@@ -91,6 +91,8 @@ class Server(tornado.web.Application):
         self.name = None
 
         self.internal = None
+        self.shutting_down = False
+        self.graceful_shutdown = options.graceful_shutdown
 
         tornado.ioloop.IOLoop.instance().set_blocking_log_threshold(0.5)
 
@@ -293,32 +295,42 @@ class Server(tornado.web.Application):
             raise jsonrpc.JsonRPCError(-32600, "No such method")
 
     def __sig_handler__(self, sig, frame):
+        if self.shutting_down:
+            return
+
         logging.warning('Caught signal: %s', sig)
         tornado.ioloop.IOLoop.instance().add_callback(self.shutdown)
 
     def shutdown(self):
+        self.shutting_down = True
+
         logging.info('Stopping server!')
         self.http_server.stop()
 
-        for model in self.get_models():
-            if hasattr(model, "stopped"):
-                tornado.ioloop.IOLoop.instance().add_callback(model.stopped)
+        if self.graceful_shutdown:
 
-        logging.info('Will shutdown in %s seconds ...', MAX_WAIT_SECONDS_BEFORE_SHUTDOWN)
-        io_loop = tornado.ioloop.IOLoop.instance()
+            for model in self.get_models():
+                if hasattr(model, "stopped"):
+                    tornado.ioloop.IOLoop.instance().add_callback(model.stopped)
 
-        deadline = time.time() + MAX_WAIT_SECONDS_BEFORE_SHUTDOWN
+            logging.info('Will shutdown in %s seconds ...', MAX_WAIT_SECONDS_BEFORE_SHUTDOWN)
+            io_loop = tornado.ioloop.IOLoop.instance()
 
-        # noinspection PyProtectedMember
-        def stop_loop():
-            now = time.time()
-            if now < deadline and (io_loop._callbacks or io_loop._timeouts):
-                io_loop.add_timeout(now + 1, stop_loop)
-            else:
-                io_loop.stop()
-                logging.info('Stopped!')
+            deadline = time.time() + MAX_WAIT_SECONDS_BEFORE_SHUTDOWN
 
-        stop_loop()
+            # noinspection PyProtectedMember
+            def stop_loop():
+                now = time.time()
+                if now < deadline and (io_loop._callbacks or io_loop._timeouts):
+                    io_loop.add_timeout(now + 1, stop_loop)
+                else:
+                    io_loop.stop()
+                    logging.info('Stopped!')
+            stop_loop()
+
+        else:
+            tornado.ioloop.IOLoop.instance().stop()
+            logging.info('Stopped!')
 
 
 def init():

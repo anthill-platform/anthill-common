@@ -77,3 +77,10 @@ define("serve_static",
        default=True,
        help="Should service serve /static files or should it be done by reverse proxy",
        type=bool)
+
+# Other
+
+define("graceful_shutdown",
+       default=True,
+       help="Whether should service shutdown gracefully or not",
+       type=bool)

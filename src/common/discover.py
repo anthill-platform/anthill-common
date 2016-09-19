@@ -42,7 +42,7 @@ class Discovery(object):
         })
 
         raise Return({
-            service_id: self.services[network + service_id]
+            service_id: self.services[network + ":" + service_id]
             for service_id in services
         })
 
@@ -85,7 +85,11 @@ class Discovery(object):
 
 
 class DiscoveryError(Exception):
-    pass
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return self.message
 
 
 cache = None
