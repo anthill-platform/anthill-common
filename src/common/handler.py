@@ -6,6 +6,7 @@ import urllib
 import tornado.escape
 import tornado.httpclient
 import tornado.websocket
+import tornado.ioloop
 
 from tornado.gen import coroutine, Return, is_future
 from tornado.web import HTTPError, RequestHandler
@@ -278,6 +279,8 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornad
 
         AuthenticatedHandlerMixin.__init__(self, application)
 
+        self._pingcb = None
+
     # noinspection PyMethodMayBeStatic
     @coroutine
     def prepared(self):
@@ -290,6 +293,32 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornad
                 "Access denied ('{0}' required)".format(
                     ", ".join(scopes or []))
                 if scopes else "Access denied")
+
+    def __do_ping__(self):
+        if self.ws_connection:
+            self.ping("")
+
+    def open(self, *args, **kwargs):
+        tornado.ioloop.IOLoop.current().spawn_callback(self.opened, *args, **kwargs)
+        if self.enable_ping():
+            self._pingcb = tornado.ioloop.PeriodicCallback(self.__do_ping__, 10000)
+            self._pingcb.start()
+
+    def on_close(self):
+        if self._pingcb:
+            self._pingcb.stop()
+        tornado.ioloop.IOLoop.current().spawn_callback(self.closed)
+
+    @coroutine
+    def closed(self):
+        pass
+
+    @coroutine
+    def opened(self, *args, **kwargs):
+        pass
+
+    def enable_ping(self):
+        return True
 
     def required_scopes(self):
         """
