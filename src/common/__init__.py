@@ -126,9 +126,12 @@ def retry(operation=None, max=3, delay=5):
 
 
 def to_int(value):
+    if value is None:
+        return 0
+
     try:
         return int(value)
-    except ValueError:
+    except (TypeError, ValueError):
         return 0
 
 

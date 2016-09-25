@@ -659,7 +659,7 @@ class AMQPChannel(AMQPObject):
         self._channel = channel
 
         # If we had any exchanges, declare those now
-        for ex in self._get_exchanges():
+        for ex in filter(bool, self._get_exchanges()):
             try:
                 log.debug('Declaring exchange %s', ex.exchange)
                 yield ex.declare(timeout)
@@ -667,7 +667,7 @@ class AMQPChannel(AMQPObject):
                 log.exception('Failed to declare exchange %s', ex.exchange)
 
         # If we had any queues, declare those now
-        for q in self._get_queues():
+        for q in filter(bool, self._get_queues()):
             try:
                 log.debug('Declaring queue %s', q.routing_key)
                 yield q.declare(timeout)

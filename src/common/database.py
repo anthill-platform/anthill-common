@@ -10,6 +10,8 @@ from pymysql import OperationalError as ConnectionError
 from pymysql import IntegrityError as DuplicateError
 from pymysql import IntegrityError as ConstraintsError
 
+import ujson
+
 
 def concatenated_hash(args):
     return "_".join(str(h_arg) for h_arg in args)
@@ -197,30 +199,40 @@ class ConditionError(Exception):
     pass
 
 
-def format_conditions(args):
-
-    def validate_condition(cond):
-        if cond in ["=", "<", ">", "<=", ">=", "<>"]:
-            return cond
-        raise ConditionError("Bad condition")
-
-    keys = " AND ".join("`{0}` {1} %s".format(key, validate_condition(condition)) for key, condition, value in args)
-    values = [value for key, condition, value in args]
-
-    return keys, values
-
-
 def format_conditions_json(field, args):
 
-    tuples = [(key, value) for key, value in args.iteritems()]
-    keys = " AND ".join(
+    def parse_condition(obj):
+        if isinstance(obj, (str, unicode, bool, float, int)):
+            return "=", obj
+
+        if isinstance(obj, dict):
+            if "@func" in obj and "@value" in obj:
+                cond = obj["@func"]
+                val = obj["@value"]
+
+                if cond not in ["=", "<", ">", "<=", ">=", "!="]:
+                    raise ConditionError("Not allowed condition!")
+
+                return cond, val
+
+        raise ConditionError("Bad value!")
+
+    for arg in args:
+        if not isinstance(arg, (str, unicode)):
+            raise ConditionError("Bad condition: not a string")
+
+    tuples = [(key,) + parse_condition(value) for key, value in args.iteritems()]
+
+    body = "AND ".join([
         """
-        JSON_EXTRACT(`{0}`, '$.{1}') = %s
-        """.format(
-            field,
-            key)
-        for key, value in tuples)
+            CONVERT(JSON_EXTRACT(`{0}`, %s), CHAR(255)) {1} %s
+        """.format(field, cond)
+        for key, cond, value in tuples
+    ])
 
-    values = [value for key, value in tuples]
+    def values():
+        for key, cond, value in tuples:
+            yield "$.\"{0}\"".format(key)
+            yield ujson.dumps(value)
 
-    return keys, values
+    return body, list(values())

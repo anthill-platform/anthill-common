@@ -277,6 +277,12 @@ class Server(tornado.web.Application):
     def __on_internal_receive__(self, context, method, *args, **kwargs):
         if hasattr(self.internal_handler, method):
 
+            if not isinstance(method, (str, unicode)):
+                raise jsonrpc.JsonRPCError(-32600, "Method is not a string")
+
+            if method.startswith("_"):
+                raise jsonrpc.JsonRPCError(-32600, "No such method")
+
             timer = ElapsedTime("incoming request: {0}".format(method))
 
             # noinspection PyBroadException

@@ -3,6 +3,37 @@ from tornado.gen import coroutine, Return, Task
 from common.options import options
 
 import common.keyvalue
+from common import to_int
+
+
+class RateLimitExceeded(Exception):
+    pass
+
+
+class RateLimitLock(object):
+    def __init__(self, limit, action, key):
+        self.limit = limit
+        self.action = action
+        self.key = key
+        self._allowed = True
+
+    @coroutine
+    def rollback(self):
+        if not self._allowed:
+            raise Return()
+
+        self._allowed = False
+
+        db = self.limit.kv.acquire()
+        pipe = db.pipeline()
+
+        try:
+            for range_, time_ in RateLimit.RANGES:
+                key_ = "rate:" + self.action + ":" + self.key + ":" + str(range_)
+                pipe.incr(key_)
+        finally:
+            yield Task(pipe.execute)
+            yield db.release()
 
 
 class RateLimit(object):
@@ -16,7 +47,22 @@ class RateLimit(object):
         "upload_score": (10, 60)
     })
 
+    Usage:
+
+    try:
+        limit = yield ratelimit.limit("test", 5)
+    except RateLimitExceeded:
+        code_is_not_allowed()
+    else:
+        try:
+            allowed_code()
+        except SomeError:
+            # should be called only if the allowed code is failed
+            yield limit.rollback()
+
     """
+
+    RANGES = [(8, 16), (4, 8), (2, 4), (1, 1)]
 
     def __init__(self, actions):
         """
@@ -57,18 +103,29 @@ class RateLimit(object):
         db = self.kv.acquire()
 
         try:
-            key = "rate:" + key
-            value = yield Task(db.get, key)
+            keys = ["rate:" + action + ":" + key + ":" + str(range_) for range_, time_ in RateLimit.RANGES]
 
-            if value:
-                if value < 0:
-                    raise Return(False)
-                else:
-                    yield Task(db.decr, key)
-                    raise Return(True)
-            else:
-                yield Task(db.setex, key, requests_in_time, max_requests)
-                raise Return(True)
+            values = yield Task(db.mget, keys)
+
+            pipe = db.pipeline()
+
+            try:
+                for (range_, time_), value in zip(RateLimit.RANGES, values):
+                    key_ = "rate:" + action + ":" + key + ":" + str(range_)
+
+                    if value is None:
+                        pipe.setex(key_, requests_in_time * time_, max_requests * range_ - 1)
+                    else:
+                        value = to_int(value)
+
+                        if value <= 0:
+                            raise RateLimitExceeded()
+                        else:
+                            pipe.decr(key_)
+            finally:
+                yield Task(pipe.execute)
+
+            raise Return(RateLimitLock(self, action, key))
 
         finally:
             yield db.release()
