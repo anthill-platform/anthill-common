@@ -22,8 +22,6 @@ import handler
 import traceback
 import time
 import signal
-import os
-import errno
 
 # just included to define things
 import options.default as opts_
@@ -250,13 +248,6 @@ class Server(tornado.web.Application):
             self.http_server.listen(int(port), "127.0.0.1")
 
         def listen_unix(sock):
-
-            try:
-                os.makedirs(os.path.dirname(sock))
-            except OSError, e:
-                if e.errno != errno.EEXIST:
-                    raise
-
             logging.info("Listening for socket: " + sock)
             unix_socket = tornado.netutil.bind_unix_socket(sock, mode=0o777)
             self.http_server.add_socket(unix_socket)
