@@ -33,6 +33,31 @@ class Model(object):
                 yield getattr(self, method_name)()
 
     @coroutine
+    def __setup_trigger__(self, trigger_name):
+        triggers = yield self.get_setup_db().get(
+            """
+                SHOW TRIGGERS WHERE `Trigger`=%s;
+            """, trigger_name)
+
+        if triggers:
+            return
+
+        with (open("sql/{0}.sql".format(trigger_name))) as f:
+            sql = f.read()
+
+        try:
+            yield self.get_setup_db().execute(sql)
+        except DatabaseError as e:
+            logging.error("Failed to create trigger '{0}': {1}".format(trigger_name, e.args[1]))
+        else:
+            logging.warn("Created trigger '{0}'".format(trigger_name))
+
+            method_name = "setup_trigger_" + trigger_name
+
+            if hasattr(self, method_name):
+                yield getattr(self, method_name)()
+
+    @coroutine
     def __setup_table__(self, table_name):
         tables = yield self.get_setup_db().get(
             """
@@ -64,6 +89,9 @@ class Model(object):
     def get_setup_events(self):
         return []
 
+    def get_setup_triggers(self):
+        return []
+
     def get_setup_db(self):
         raise NotImplementedError()
 
@@ -74,6 +102,9 @@ class Model(object):
 
         for event in self.get_setup_events():
             yield self.__setup_event__(event)
+
+        for trigger in self.get_setup_triggers():
+            yield self.__setup_trigger__(trigger)
 
     @coroutine
     def stopped(self):
