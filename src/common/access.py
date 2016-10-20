@@ -100,9 +100,6 @@ class AccessToken:
     def get(self, field, default=None):
         return self.fields.get(field, default)
 
-    def get_status(self):
-        return self.status
-
     def has_scope(self, scope):
         return scope in self.scopes
 
@@ -384,14 +381,18 @@ def scoped(scopes=None, method=None, **other):
     return wrapper1
 
 
+def remote_ip(request):
+    real_ip = request.headers.get("X-Real-IP")
+    return real_ip or request.remote_ip
+
+
 def internal(method):
     def wrapper(self, *args, **kwargs):
         internal_ = self.application.internal
 
-        real_ip = self.request.headers.get("X-Real-IP")
-        remote_ip = real_ip or self.request.remote_ip
+        ip = remote_ip(self.request)
 
-        if not internal_.is_internal(remote_ip):
+        if not internal_.is_internal(ip):
             # attacker shouldn't even know this page exists
             raise HTTPError(404)
 
