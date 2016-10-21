@@ -8,7 +8,7 @@ import json
 from zmq.eventloop import ioloop, zmqstream
 
 from pubsub import Subscriber, Publisher
-from jsonrpc import JsonRPC
+from jsonrpc import JsonRPC, JsonRPCError
 
 ioloop.install()
 
@@ -53,7 +53,10 @@ class ZMQInterProcess(JsonRPC):
         self.__pre_init__()
         path = self.settings["path"]
         logging.info("Listening as server: " + path)
-        self.socket.bind("ipc://{0}".format(path))
+        try:
+            self.socket.bind("ipc://{0}".format(path))
+        except zmq.ZMQError as e:
+            raise JsonRPCError("Failed to listen socket: " + str(e))
         self.__post_init__()
 
     @coroutine
