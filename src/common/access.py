@@ -161,6 +161,10 @@ class AccessToken:
             self.valid = False
             return False
 
+        if not isinstance(self.account, (unicode, str)):
+            self.valid = False
+            return False
+
         self.valid = True
         return True
 
