@@ -436,7 +436,7 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
             except StreamCommandError as e:
                 raise jsonrpc.JsonRPCError(e.code, e.message)
             except Exception as e:
-                raise jsonrpc.JsonRPCError(500, "Error: " + e.args[0])
+                raise jsonrpc.JsonRPCError(500, "Error: " + str(e))
 
             raise Return(response)
 
