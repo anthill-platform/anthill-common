@@ -46,6 +46,8 @@ class ZMQInterProcess(JsonRPC):
     def release(self):
         path = self.settings["path"]
         logging.info("Closing: " + path)
+
+        self.stream.on_recv(None)
         self.socket.close()
 
     @coroutine
