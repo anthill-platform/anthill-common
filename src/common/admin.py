@@ -6,6 +6,7 @@ import access
 import jsonrpc
 import ujson
 import logging
+import base64
 
 from tornado.gen import coroutine, Return
 from tornado.web import HTTPError
@@ -56,7 +57,7 @@ class AdminController(object):
     """
     Single administration point. Allows user do administrate one action (bound by method app.get_admin).
 
-    Please override methods 'get', 'render', 'scopes_read', 'scopes_write' and other custom.
+    Please override methods 'get', 'render', 'access_scopes' and other custom.
 
     Additional information about this action (for example, account number we editing) is stored in `context`.
     When method 'get' is called, the whole context arguments is passed to is.
@@ -146,15 +147,9 @@ class AdminController(object):
 
         return result
 
-    def scopes_read(self):
+    def access_scopes(self):
         """
         :returns: a list of scopes required to show this action.
-        """
-        return []
-
-    def scopes_write(self):
-        """
-        :returns: a list of scopes required to edit this action.
         """
         return []
 
@@ -173,6 +168,12 @@ class AdminActions(object):
         return {action_id: action.scheme() for action_id, action in self.actions.iteritems()}
 
 
+class AdminFile(object):
+    def __init__(self, name, data):
+        self.name = name
+        self.data = base64.b64decode(data)
+
+
 class AdminHandler(handler.AuthenticatedHandler):
     def __init__(self, application, request, **kwargs):
         handler.AuthenticatedHandler.__init__(self, application, request, **kwargs)
@@ -183,7 +184,7 @@ class AdminHandler(handler.AuthenticatedHandler):
     @internal
     @scoped(scopes=["admin"])
     def get(self):
-        scopes = self.action.scopes_read()
+        scopes = self.action.access_scopes()
         token = self.current_user.token
 
         if not token.has_scopes(scopes):
@@ -233,7 +234,7 @@ class AdminHandler(handler.AuthenticatedHandler):
     @internal
     @scoped(scopes=["admin"])
     def post(self):
-        scopes = self.action.scopes_write()
+        scopes = self.action.access_scopes()
         token = self.current_user.token
 
         if not token.has_scopes(scopes):
@@ -248,6 +249,9 @@ class AdminHandler(handler.AuthenticatedHandler):
         except (KeyError, ValueError):
             raise HTTPError(400, "Bad request")
 
+        if not isinstance(data, dict):
+            raise HTTPError(400, "Bad request")
+
         method_name = self.get_argument("method")
 
         try:
@@ -255,8 +259,21 @@ class AdminHandler(handler.AuthenticatedHandler):
         except AttributeError:
             raise HTTPError(405, "No such method: " + method_name)
 
+        def process(name, value):
+
+            if isinstance(value, dict):
+                if "@files" in value:
+                    return [AdminFile(name, d) for name, d in value["@files"].iteritems()]
+
+            return value
+
+        arguments = {
+            name: process(name, value)
+            for name, value in data.iteritems()
+        }
+
         try:
-            data = yield action_method(**data)
+            data = yield action_method(**arguments)
         except ActionError as e:
             result = AdminController.render_error(e.title, e.links)
             self.set_status(ACTION_ERROR, "Action-Error")

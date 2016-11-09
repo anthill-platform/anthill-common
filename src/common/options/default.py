@@ -18,7 +18,7 @@ define("internal_broker",
        type=str)
 
 define("internal_max_connections",
-       default=10,
+       default=1,
        help="Maximum connections for internal broker (connection pool).",
        group="internal",
        type=int)
@@ -79,6 +79,11 @@ define("serve_static",
        type=bool)
 
 # Other
+
+define("debug",
+       default=False,
+       help="Is debug mode enabled (full stack trace)",
+       type=bool)
 
 define("graceful_shutdown",
        default=True,

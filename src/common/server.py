@@ -84,7 +84,7 @@ class Server(tornado.web.Application):
                              {'path': 'static', "default_filename": "index.html"}))
 
         super(Server, self).__init__(
-            handlers=handlers, debug=True
+            handlers=handlers, debug=options.debug
         )
 
         self.token_cache = access.AccessTokenCache()

@@ -49,6 +49,7 @@ class ZMQInterProcess(JsonRPC):
 
         self.stream.on_recv(None)
         self.stream.close()
+        self.context.term()
 
     @coroutine
     def server(self):
