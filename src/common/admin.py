@@ -424,7 +424,6 @@ class AdminHandler(handler.AuthenticatedHandler):
 class AdminMetadataHandler(handler.AuthenticatedHandler):
     @coroutine
     @internal
-    @scoped(scopes=["admin"])
     def get(self):
         if not self.application.metadata:
             raise HTTPError(404, "No metadata")
