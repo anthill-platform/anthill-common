@@ -223,16 +223,16 @@ def format_conditions_json(field, args):
 
     tuples = [(key,) + parse_condition(value) for key, value in args.iteritems()]
 
-    body = "AND ".join([
+    conditions = [
         """
             CONVERT(JSON_EXTRACT(`{0}`, %s), CHAR(255)) {1} %s
         """.format(field, cond)
         for key, cond, value in tuples
-    ])
+    ]
 
     def values():
         for key, cond, value in tuples:
             yield "$.\"{0}\"".format(key)
             yield ujson.dumps(value)
 
-    return body, list(values())
+    return zip(conditions, list(values()))
