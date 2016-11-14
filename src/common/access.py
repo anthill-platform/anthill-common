@@ -149,11 +149,12 @@ class AccessToken:
             self.valid = False
             return False
 
+        self.account = self.get(AccessToken.ACCOUNT)
+
         try:
             self.name = self.get(AccessToken.USERNAME)
             self.uuid = self.get(AccessToken.UUID)
             self.scopes = parse_scopes(self.get(AccessToken.SCOPES))
-            self.account = self.get(AccessToken.ACCOUNT)
 
             self.expiration_date = int(self.get(AccessToken.EXPIRATION_DATE))
             self.issued_at = int(self.get(AccessToken.ISSUED_AT))
@@ -161,7 +162,8 @@ class AccessToken:
             self.valid = False
             return False
 
-        if not isinstance(self.account, (unicode, str)):
+        # account may be empty
+        if self.account and (not isinstance(self.account, (unicode, str))):
             self.valid = False
             return False
 
