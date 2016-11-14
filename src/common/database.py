@@ -232,7 +232,6 @@ def format_conditions_json(field, args):
 
     def values():
         for key, cond, value in tuples:
-            yield "$.\"{0}\"".format(key)
-            yield ujson.dumps(value)
+            yield ("$.\"{0}\"".format(key), ujson.dumps(value))
 
     return zip(conditions, list(values()))
