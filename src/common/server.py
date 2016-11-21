@@ -55,7 +55,10 @@ class Server(tornado.web.Application):
         admin_actions = self.get_admin()
         if admin_actions:
             self.actions = admin.AdminActions(admin_actions)
-            handlers.append((r"/@admin", admin.AdminHandler))
+            handlers.extend([
+                (r"/@admin", admin.AdminHandler),
+                (r"/@admin_upload", admin.AdminUploadHandler)
+            ])
         else:
             self.actions = None
 

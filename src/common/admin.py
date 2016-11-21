@@ -9,7 +9,7 @@ import logging
 import base64
 
 from tornado.gen import coroutine, Return
-from tornado.web import HTTPError
+from tornado.web import HTTPError, stream_request_body
 from access import scoped, internal
 
 """
@@ -88,7 +88,9 @@ class AdminController(object):
         self.application = app
         self.token = token
         self.context = {}
-        self.gamespace = self.token.get(access.AccessToken.GAMESPACE)
+
+        if self.token:
+            self.gamespace = self.token.get(access.AccessToken.GAMESPACE)
 
     @coroutine
     def get(self, **context):
@@ -154,6 +156,23 @@ class AdminController(object):
         return []
 
 
+class UploadAdminController(AdminController):
+    """
+    Same as above, but with upload stream support
+    """
+    @coroutine
+    def receive_started(self, filename):
+        pass
+
+    @coroutine
+    def receive_completed(self):
+        pass
+
+    @coroutine
+    def receive_data(self, chunk):
+        pass
+
+
 class AdminActions(object):
     def __init__(self, actions):
         self.actions = actions
@@ -172,6 +191,106 @@ class AdminFile(object):
     def __init__(self, name, data):
         self.name = name
         self.data = base64.b64decode(data)
+
+
+@stream_request_body
+class AdminUploadHandler(handler.AuthenticatedHandler):
+
+    def __init__(self, application, request, **kwargs):
+        super(AdminUploadHandler, self).__init__(application, request, **kwargs)
+        self.action = None
+        self.actions = None
+        self.filename = ""
+        self.total_received = 0
+
+    @coroutine
+    @internal
+    @scoped(scopes=["admin"])
+    def put(self):
+        try:
+            result = yield self.action.receive_completed()
+        except ActionError as e:
+            result = AdminController.render_error(e.title, e.links)
+            self.set_status(ACTION_ERROR, "Action-Error")
+        except TypeError as e:
+            logging.exception("TypeError")
+            raise HTTPError(400, e.message)
+        except Redirect as e:
+
+            # special status 470 means redirect
+            self.set_status(REDIRECT, "Redirect-To")
+
+            result = {
+                "context": e.context,
+                "redirect-to": e.action
+            }
+
+            if e.notice:
+                result["notice"] = e.notice
+
+        self.dumps(result)
+
+    def get_action(self, action_id):
+        action_class = self.actions.action(action_id)
+
+        if action_class is None:
+            raise HTTPError(404, "No such action: " + action_id)
+
+        if not issubclass(action_class, UploadAdminController):
+            raise HTTPError(400, "Action does not support uploading")
+
+        return action_class(self.application, self.token)
+
+    @coroutine
+    def prepare(self):
+        self.request.connection.set_max_body_size(1073741824)
+        yield super(AdminUploadHandler, self).prepare()
+
+    @coroutine
+    @internal
+    @scoped(scopes=["admin"])
+    def prepared(self):
+        self.actions = self.application.actions
+        self.action = self.get_action(self.get_argument("action"))
+        self.filename = self.request.headers.get("X-File-Name", "")
+
+        self.action.context = ujson.loads(self.get_argument("context"))
+
+        scopes = self.action.access_scopes()
+        token = self.current_user.token
+
+        if not token.has_scopes(scopes):
+            self.set_header("Need-Scopes", ",".join(scopes))
+            raise HTTPError(401, "Need to authorize.")
+
+        try:
+            yield self.action.receive_started(self.filename)
+        except ActionError as e:
+            self.set_status(ACTION_ERROR, "Action-Error")
+            self.finish(e.title)
+        except TypeError as e:
+            logging.exception("TypeError")
+            raise HTTPError(400, e.message)
+        except Redirect as e:
+
+            # special status 470 means redirect
+            self.set_status(REDIRECT, "Redirect-To")
+
+            result = {
+                "context": e.context,
+                "redirect-to": e.action
+            }
+
+            if e.notice:
+                result["notice"] = e.notice
+
+            self.dumps(result)
+            self.finish()
+
+    @coroutine
+    def data_received(self, chunk):
+        self.total_received += len(chunk)
+        yield self.action.receive_data(chunk)
 
 
 class AdminHandler(handler.AuthenticatedHandler):
@@ -516,6 +635,26 @@ def link(url, title, icon=None, badge=None, **context):
         "title": title,
         "context": context,
         "badge": badge,
+        "class": "link",
+        "icon": icon
+    }
+
+
+def status(title, style, icon=None):
+    """
+    A status line, with possible icon.
+    :param title: Status title
+    :param style: Status style (primary, danger etc)
+    :param icon: (optional) An icon next to the status (font-awesome)
+
+    status("Loading", "refresh fa-spin")
+    status("Complete", "check")
+    """
+
+    return {
+        "style": style,
+        "title": title,
+        "class": "status",
         "icon": icon
     }
 
@@ -682,6 +821,20 @@ def breadcrumbs(items, title):
     }
 
 
+def file_upload(title, action=""):
+    """
+    File upload form. Has streaming support so big files can be uploaded.
+    :param title: A title of the upload form
+    :param action: Upload target action that will receive the file. Empty for current action.
+            Please note, such action should be inherited from UploadAdminController
+    """
+    return {
+        "class": "file_upload",
+        "title": title,
+        "action": action
+    }
+
+
 def form(title, fields, methods, data, icon=None, **context):
     """
     Used by user to edit some data.
@@ -749,7 +902,7 @@ def button(url, title, style, _method="get", **context):
     }
 
 
-def content(title, headers, items, style):
+def content(title, headers, items, style, **context):
     """
     A table.
     :param title: Table's title.
@@ -763,7 +916,8 @@ def content(title, headers, items, style):
         "title": title,
         "headers": headers,
         "items": items,
-        "style": style
+        "style": style,
+        "context": context
     }
 
 

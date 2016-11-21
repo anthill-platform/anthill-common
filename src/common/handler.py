@@ -334,8 +334,8 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
     Authenticated web socket handler, but with JSONRPC protocol.
     Allows to setup JSONRPC communication with client. Please see http://www.jsonrpc.org/specification for detail.
 
-    To send an rpc command (without expecting a response), call yield self.rpc(self, 'methid', .. arguments ..)
-    To send a request command (with response), call yield self.request(self, 'methid', .. arguments ..),
+    To send an rpc command (without expecting a response), call yield self.rpc(self, 'method', .. arguments ..)
+    To send a request command (with response), call yield self.request(self, 'method', .. arguments ..),
         the result of such instruction is a response from a client, or JsonRPCTimeout exception.
 
     To receive a command, just define appropriate method in a subclass:
