@@ -471,7 +471,8 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
 
     @coroutine
     def closed(self):
-        self.action.on_close()
+        if self.action:
+            self.action.on_close()
 
     def on_message(self, message):
         tornado.ioloop.IOLoop.current().spawn_callback(self.action.on_message, message)
