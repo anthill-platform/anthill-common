@@ -33,7 +33,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         super(Internal, self).__init__()
 
     @coroutine
-    def get(self, service, url, data, use_json=True, discover_service=True):
+    def get(self, service, url, data, use_json=True, discover_service=True, timeout=20):
         """
         Requests a http GET page.
 
@@ -43,6 +43,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         :param use_json: whenever should the result be converted to json or not
         :param discover_service: if True, <service> argument is a service ID,
             if False, <service> is just server location.
+        :param timeout: a request timeout in seconds
         :return: Requested data
         """
         if discover_service:
@@ -59,9 +60,13 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         timer = ElapsedTime("get -> {0}@{1}".format(url, service))
 
         try:
-            result = yield self.client.fetch(
+            request = tornado.httpclient.HTTPRequest(
                 service_location + "/" + url + "?" + urllib.urlencode(data),
-                method='GET')
+                method='GET',
+                request_timeout=timeout
+            )
+
+            result = yield self.client.fetch(request)
 
         except tornado.httpclient.HTTPError as e:
             raise InternalError(e.code, e.response.body if hasattr(e.response, "body") else "", e.response)
@@ -104,7 +109,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         return content
 
     @coroutine
-    def post(self, service, url, data, use_json=True, discover_service=True):
+    def post(self, service, url, data, use_json=True, discover_service=True, timeout=20):
         """
         Posts a http request to a page.
 
@@ -114,6 +119,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         :param use_json: whenever should the result be converted to json or not
         :param discover_service: if True, <service> argument is a service ID,
             if False, <service> is just server location.
+        :param timeout: a request timeout in seconds
         :return: Requested data
         """
         if discover_service:
@@ -130,10 +136,13 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         timer = ElapsedTime("post -> {0}@{1}".format(url, service))
 
         try:
-            result = yield self.client.fetch(
+            request = tornado.httpclient.HTTPRequest(
                 service_location + "/" + url,
                 method='POST',
-                body=urllib.urlencode(data))
+                body=urllib.urlencode(data),
+                request_timeout=timeout)
+
+            result = yield self.client.fetch(request)
 
         except tornado.httpclient.HTTPError as e:
             raise InternalError(e.code, e.response.body if hasattr(e.response, "body") else "", e.response)
