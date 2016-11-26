@@ -135,6 +135,10 @@ def to_int(value):
         return 0
 
 
+def clamp(n, smallest, largest):
+    return max(smallest, min(n, largest))
+
+
 def update(d, u):
     for k, v in u.iteritems():
         if v is None:
