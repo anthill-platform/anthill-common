@@ -249,7 +249,7 @@ class AdminUploadHandler(handler.AuthenticatedHandler):
     @coroutine
     @internal
     @scoped(scopes=["admin"])
-    def prepared(self):
+    def prepared(self, *args, **kwargs):
         self.actions = self.application.actions
         self.action = self.get_action(self.get_argument("action"))
         self.filename = self.request.headers.get("X-File-Name", "")
@@ -434,7 +434,7 @@ class AdminMetadataHandler(handler.AuthenticatedHandler):
 class AdminWSActionConnection(handler.AuthenticatedWSHandler):
     @internal
     @coroutine
-    def prepared(self):
+    def prepared(self, *args, **kwargs):
         yield super(AdminWSActionConnection, self).prepared()
 
         action = self.get_argument("action")
@@ -451,7 +451,7 @@ class AdminWSActionConnection(handler.AuthenticatedWSHandler):
 class AdminWSConnection(handler.AuthenticatedWSHandler):
     @internal
     @coroutine
-    def prepared(self):
+    def prepared(self, *args, **kwargs):
         yield super(AdminWSConnection, self).prepared()
 
 
@@ -483,7 +483,7 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
 
     @internal
     @coroutine
-    def prepared(self):
+    def prepared(self, *args, **kwargs):
         yield super(AdminWSHandler, self).prepared()
 
         self.action = self.get_action(self.get_argument("action"))

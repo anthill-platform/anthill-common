@@ -218,12 +218,17 @@ class AuthenticatedHandlerMixin(object):
             if db is not None:
                 yield db.release()
 
-        result = self.prepared()
+        result = self.prepared(*self.path_args, **self.path_kwargs)
         if is_future(result):
             yield result
 
     @coroutine
-    def prepared(self):
+    def prepared(self, *args, **kwargs):
+        """
+        Called when handler is completely prepared for processing
+        :param args: a list of path arguments as it would go to 'get' or corresponding request method
+        :param kwargs: a dict of path arguments as it would go to 'get' or corresponding request method
+        """
         pass
 
     def token_invalidated(self, token):
@@ -283,7 +288,7 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornad
 
     # noinspection PyMethodMayBeStatic
     @coroutine
-    def prepared(self):
+    def prepared(self, *args, **kwargs):
         user = self.current_user
         scopes = self.required_scopes()
 
@@ -364,8 +369,10 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
                 response = yield getattr(self, action)(*args, **kwargs)
             except TypeError as e:
                 raise jsonrpc.JsonRPCError(400, "Bad arguments: " + e.args[0])
+            except jsonrpc.JsonRPCError as e:
+                raise e
             except Exception as e:
-                raise jsonrpc.JsonRPCError(500, "Error: " + e.args[0])
+                raise jsonrpc.JsonRPCError(500, "Error: " + str(e))
 
             raise Return(response)
 

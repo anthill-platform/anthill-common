@@ -7,6 +7,7 @@ import random
 import string
 import time
 import ujson
+import signal
 from inspect import isfunction
 
 
@@ -163,3 +164,23 @@ class ElapsedTime(object):
     def done(self):
         elapsed_time = time.time() - self.start_time
         return '[{}] finished in {} ms'.format(self.name, int(elapsed_time * 1000))
+
+
+class SyncTimeout():
+    """Timeout class using ALARM signal."""
+
+    class TimeoutError(Exception):
+        pass
+
+    def __init__(self, sec):
+        self.sec = sec
+
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.raise_timeout)
+        signal.alarm(self.sec)
+
+    def __exit__(self, *args):
+        signal.alarm(0)  # disable alarm
+
+    def raise_timeout(self, *args):
+        raise SyncTimeout.TimeoutError()
