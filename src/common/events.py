@@ -12,7 +12,7 @@ class Publisher(object):
 
         for listener in self.listeners[event]:
             if hasattr(listener, event):
-                tornado.ioloop.IOLoop.current().spawn_callback(getattr(listener, event), *args, **kwargs)
+                tornado.ioloop.IOLoop.current().add_callback(getattr(listener, event), *args, **kwargs)
 
     def subscribe(self, events, listener):
         for event in events:

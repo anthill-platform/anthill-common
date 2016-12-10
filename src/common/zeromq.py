@@ -24,7 +24,7 @@ class ZMQInterProcess(JsonRPC):
 
     def __on_receive__(self, messages):
         for msg in messages:
-            tornado.ioloop.IOLoop.current().spawn_callback(self.received, self, msg)
+            tornado.ioloop.IOLoop.current().add_callback(self.received, self, msg)
 
     def __post_init__(self):
         self.stream = zmqstream.ZMQStream(self.socket)
@@ -47,8 +47,12 @@ class ZMQInterProcess(JsonRPC):
         path = self.settings["path"]
         logging.info("Closing: " + path)
 
-        self.stream.on_recv(None)
-        self.stream.close()
+        try:
+            self.stream.on_recv(None)
+            self.stream.close()
+        except IOError:
+            pass
+
         self.context.term()
 
     @coroutine

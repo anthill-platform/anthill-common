@@ -681,6 +681,7 @@ class AMQPChannel(AMQPObject):
     is_closed = property(lambda s: s._channel.is_closed)
     is_closing = property(lambda s: s._channel.is_closing)
     is_open = property(lambda s: s._channel.is_open)
+    is_active = property(lambda s: bool(s._channel))
 
     # ------------------------------------------------------------------------
     # Channel callbacks

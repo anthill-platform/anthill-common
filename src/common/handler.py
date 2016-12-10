@@ -304,7 +304,7 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornad
             self.ping("")
 
     def open(self, *args, **kwargs):
-        tornado.ioloop.IOLoop.current().spawn_callback(self.opened, *args, **kwargs)
+        tornado.ioloop.IOLoop.current().add_callback(self.opened, *args, **kwargs)
         if self.enable_ping():
             self._pingcb = tornado.ioloop.PeriodicCallback(self.__do_ping__, 10000)
             self._pingcb.start()
@@ -312,7 +312,7 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornad
     def on_close(self):
         if self._pingcb:
             self._pingcb.stop()
-        tornado.ioloop.IOLoop.current().spawn_callback(self.closed)
+        tornado.ioloop.IOLoop.current().add_callback(self.closed)
 
     @coroutine
     def closed(self):
