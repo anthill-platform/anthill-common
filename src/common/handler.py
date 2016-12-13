@@ -10,6 +10,7 @@ import tornado.ioloop
 
 from tornado.gen import coroutine, Return, is_future
 from tornado.web import HTTPError, RequestHandler
+from tornado.websocket import WebSocketClosedError
 
 import access
 import internal
@@ -383,7 +384,10 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
     # noinspection PyMethodOverriding
     @coroutine
     def write_data(self, context, data):
-        yield self.write_message(data)
+        try:
+            yield self.write_message(data)
+        except WebSocketClosedError:
+            raise jsonrpc.JsonRPCError(599, "WebSockets closed")
 
 
 class CookieAuthenticatedHandler(AuthenticatedHandler):

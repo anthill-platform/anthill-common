@@ -605,7 +605,8 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
 
     @coroutine
     def write_data(self, context, data):
-        yield self.handler.write_message(data)
+        if self.handler:
+            yield self.handler.write_message(data)
 
 
 def link(url, title, icon=None, badge=None, **context):
