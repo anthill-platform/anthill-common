@@ -217,6 +217,9 @@ def format_conditions_json(field, args):
 
         raise ConditionError("Bad value!")
 
+    if not isinstance(args, dict):
+        raise ConnectionError("Conditions expected to be a dict")
+
     for arg in args:
         if not isinstance(arg, (str, unicode)):
             raise ConditionError("Bad condition: not a string")

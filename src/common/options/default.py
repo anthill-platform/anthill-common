@@ -38,7 +38,7 @@ define("token_cache_port",
        type=int)
 
 define("token_cache_db",
-       default="127.0.0.1",
+       default=20,
        help="Database of access token cache (redis).",
        group="token_cache",
        type=int)
