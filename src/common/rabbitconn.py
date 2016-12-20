@@ -19,7 +19,7 @@ class RabbitMQConnection(aqmp.AMQPConnection):
 
         params = pika.URLParameters(broker)
 
-        params.socket_timeout(RabbitMQConnection.SOCKET_TIMEOUT)
+        params.socket_timeout = RabbitMQConnection.SOCKET_TIMEOUT
 
         super(RabbitMQConnection, self).__init__(
             params,
