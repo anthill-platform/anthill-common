@@ -10,12 +10,19 @@ from abc import ABCMeta, abstractmethod
 
 
 class RabbitMQConnection(aqmp.AMQPConnection):
+
+    SOCKET_TIMEOUT = 1.0
+
     def __init__(self, broker, **kwargs):
 
         self.connected = Future()
 
+        params = pika.URLParameters(broker)
+
+        params.socket_timeout(RabbitMQConnection.SOCKET_TIMEOUT)
+
         super(RabbitMQConnection, self).__init__(
-            pika.URLParameters(broker),
+            params,
             io_loop=IOLoop.instance(),
             on_open_callback=self.__connected__,
             on_close_callback=self.__closed__,
