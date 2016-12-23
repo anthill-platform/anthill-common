@@ -287,7 +287,7 @@ class ConditionFunctions(object):
         if not isinstance(b, (int, float)):
             raise ConditionError("Bad @b value")
 
-        return "BETWEEN %s AND %s", [str(a), str(b)]
+        return "BETWEEN %s AND %s", [a, b]
 
 
 def format_conditions_json(field, args):
