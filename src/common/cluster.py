@@ -11,6 +11,10 @@ class ClusterError(Exception):
         return self.message
 
 
+class NoClusterError(Exception):
+    pass
+
+
 class Cluster(object):
     def __init__(self, db, table_name, accounts_table_name):
         self.db = db
@@ -50,7 +54,7 @@ class Cluster(object):
         raise Return([cluster["cluster_id"] for cluster in clusters])
 
     @coroutine
-    def get_cluster(self, gamespace, account, key, cluster_size):
+    def get_cluster(self, gamespace, account, key, cluster_size, auto_create=True):
         try:
             # look for existent join
             cluster = yield self.db.get(
@@ -67,8 +71,11 @@ class Cluster(object):
         if cluster:
             raise Return(cluster["cluster_id"])
 
-        # if no account corresponding gamespace/key, then create a fresh new cluster
-        raise Return((yield self.__new_cluster__(gamespace, account, key, cluster_size)))
+        if auto_create:
+            # if no account corresponding gamespace/key, then create a fresh new cluster
+            raise Return((yield self.__new_cluster__(gamespace, account, key, cluster_size)))
+
+        raise NoClusterError()
 
     @coroutine
     def __new_cluster__(self, gamespace, account, key, cluster_size):
