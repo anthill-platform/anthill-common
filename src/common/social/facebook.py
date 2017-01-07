@@ -47,7 +47,7 @@ class FacebookAPI(common.social.SocialNetworkAPI):
             access_token = data["access_token"]
             expires_in = data["expires"]
 
-            result = common.social.AuthResponse(access_token=access_token, expires_in=expires_in)
+            result = common.social.AuthResponse(access_token=access_token, expires_in=expires_in, import_social=True)
             raise Return(result)
 
     @coroutine

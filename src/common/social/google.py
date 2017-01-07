@@ -62,7 +62,8 @@ class GoogleAPI(common.social.SocialNetworkAPI):
                 access_token=access_token,
                 expires_in=expires_in,
                 refresh_token=refresh_token,
-                username=username)
+                username=username,
+                import_social=True)
 
             raise Return(result)
 
