@@ -14,8 +14,8 @@ class GoogleAPI(common.social.SocialNetworkAPI):
 
     GOOGLE_OAUTH = "https://www.googleapis.com/oauth2/"
 
-    def __init__(self):
-        super(GoogleAPI, self).__init__()
+    def __init__(self, cache):
+        super(GoogleAPI, self).__init__("google", cache)
 
     def __parse_friend__(self, friend):
         try:
@@ -157,6 +157,9 @@ class GoogleAPI(common.social.SocialNetworkAPI):
             "language": data["locale"],
             "email": data["email"]
         }
+
+    def new_private_key(self, data):
+        return GooglePrivateKey(data)
 
 
 class GooglePrivateKey(common.social.SocialPrivateKey):

@@ -1,7 +1,12 @@
 
+from tornado.gen import coroutine, Return
+
 import tornado.httpclient
 import ujson
-import abc
+import logging
+
+from common import cached
+from common.internal import Internal
 
 
 class APIError(Exception):
@@ -33,15 +38,38 @@ class AuthResponse(object):
 
 
 class SocialNetworkAPI(object):
-    __metaclass__ = abc.ABCMeta
-
-    def __init__(self):
+    def __init__(self, credential_type, cache):
         self.client = tornado.httpclient.AsyncHTTPClient()
+        self.internal = Internal()
+        self.cache = cache
+        self.credential_type = credential_type
 
+    @coroutine
     def get_private_key(self, gamespace, data=None):
-        raise NotImplementedError()
+        """
+        Looks for a key from login service.
+        """
 
-    @abc.abstractmethod
+        if not data:
+            key_name = self.credential_type
+
+            @cached(kv=self.cache,
+                    h=lambda: "auth_key:" + str(gamespace) + ":" + key_name,
+                    ttl=300,
+                    json=True)
+            @coroutine
+            def get():
+                logging.info("Looking for key '{0}' in gamespace @{1}".format(key_name, gamespace))
+
+                key_data = yield self.internal.request(
+                    "login", "get_key", gamespace=gamespace, key_name=key_name)
+
+                raise Return(key_data)
+
+            data = yield get()
+
+        raise Return(self.new_private_key(data))
+
     def new_private_key(self, data):
         raise NotImplementedError()
 

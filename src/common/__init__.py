@@ -126,14 +126,14 @@ def retry(operation=None, max=3, delay=5):
     return wrapper1
 
 
-def to_int(value):
+def to_int(value, default=0):
     if value is None:
-        return 0
+        return default
 
     try:
         return int(value)
     except (TypeError, ValueError):
-        return 0
+        return default
 
 
 def clamp(n, smallest, largest):

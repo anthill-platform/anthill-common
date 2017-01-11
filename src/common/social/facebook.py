@@ -13,8 +13,8 @@ import common.social
 
 
 class FacebookAPI(common.social.SocialNetworkAPI):
-    def __init__(self):
-        super(FacebookAPI, self).__init__()
+    def __init__(self, cache):
+        super(FacebookAPI, self).__init__("facebook", cache)
 
     def __parse_friend__(self, friend):
         try:
@@ -119,6 +119,9 @@ class FacebookAPI(common.social.SocialNetworkAPI):
             "language": data["locale"],
             "email": data.get("email", None)
         }
+
+    def new_private_key(self, data=None):
+        return FacebookPrivateKey(data)
 
 
 class FacebookPrivateKey(common.social.SocialPrivateKey):

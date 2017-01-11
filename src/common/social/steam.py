@@ -13,8 +13,8 @@ class SteamAPI(common.social.SocialNetworkAPI):
 
     STEAM_API = "https://api.steampowered.com"
 
-    def __init__(self):
-        super(SteamAPI, self).__init__()
+    def __init__(self, cache):
+        super(SteamAPI, self).__init__("steam", cache)
 
     @coroutine
     def api_auth(self, gamespace, ticket, app_id):
@@ -43,6 +43,11 @@ class SteamAPI(common.social.SocialNetworkAPI):
                 raise common.social.APIError(500, "Steam error: no response field")
 
             response = response_object["response"]
+
+            if "errorcode" in response:
+                raise common.social.APIError(
+                    400, "Steam error: " + str(response["errorcode"]) + " " + response["errordesc"])
+
 
             if "params" not in response:
                 raise common.social.APIError(500, "Steam error: no response/params field")
@@ -109,6 +114,9 @@ class SteamAPI(common.social.SocialNetworkAPI):
             "avatar": data["avatarmedium"],
             "profile": data["profileurl"]
         }
+
+    def new_private_key(self, data):
+        return SteamPrivateKey(data)
 
 
 class SteamPrivateKey(common.social.SocialPrivateKey):
