@@ -201,7 +201,7 @@ class ConditionError(Exception):
 
 class ConditionFunctions(object):
     @staticmethod
-    def equal(obj):
+    def equal(field, path, obj):
         if "@value" not in obj:
             raise ConditionError("Value not passed")
 
@@ -210,10 +210,10 @@ class ConditionFunctions(object):
         if not isinstance(value, (str, unicode, int, float, bool)):
             raise ConditionError("Bad value")
 
-        return "= %s", [str(value)]
+        return "CAST(JSON_EXTRACT(`{0}`, %s) AS CHAR) = %s".format(field), ["$.{0}".format(path), str(value)]
 
     @staticmethod
-    def greater_than(obj):
+    def greater_than(field, path, obj):
         if "@value" not in obj:
             raise ConditionError("Value not passed")
 
@@ -222,10 +222,10 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return "> %s", [str(value)]
+        return "JSON_EXTRACT(`{0}`, %s) > %s".format(field), ["$.\"{0}\"".format(path), value]
 
     @staticmethod
-    def less_than(obj):
+    def less_than(field, path, obj):
         if "@value" not in obj:
             raise ConditionError("Value not passed")
 
@@ -234,10 +234,10 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return "< %s", [str(value)]
+        return "JSON_EXTRACT(`{0}`, %s) < %s".format(field), ["$.\"{0}\"".format(path), value]
 
     @staticmethod
-    def greater_or_equal_than(obj):
+    def greater_or_equal_than(field, path, obj):
         if "@value" not in obj:
             raise ConditionError("Value not passed")
 
@@ -246,10 +246,10 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return ">= %s", [str(value)]
+        return "JSON_EXTRACT(`{0}`, %s) >= %s".format(field), ["$.\"{0}\"".format(path), value]
 
     @staticmethod
-    def lass_or_equal_than(obj):
+    def lass_or_equal_than(field, path, obj):
         if "@value" not in obj:
             raise ConditionError("Value not passed")
 
@@ -258,10 +258,10 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return "<= %s", [str(value)]
+        return "JSON_EXTRACT(`{0}`, %s) <= %s".format(field), ["$.\"{0}\"".format(path), value]
 
     @staticmethod
-    def not_equal(obj):
+    def not_equal(field, path, obj):
         if "@value" not in obj:
             raise ConditionError("Value not passed")
 
@@ -270,10 +270,10 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return "!= %s", [str(value)]
+        return "JSON_EXTRACT(`{0}`, %s) != %s".format(field), ["$.\"{0}\"".format(path), value]
 
     @staticmethod
-    def between(obj):
+    def between(field, path, obj):
         if "@a" not in obj:
             raise ConditionError("@a is not passed")
         if "@b" not in obj:
@@ -287,7 +287,33 @@ class ConditionFunctions(object):
         if not isinstance(b, (int, float)):
             raise ConditionError("Bad @b value")
 
-        return "BETWEEN %s AND %s", [a, b]
+        return "JSON_EXTRACT(`{0}`, %s) BETWEEN %s AND %s".format(field), ["$.\"{0}\"".format(path), a, b]
+
+    @staticmethod
+    def in_set(field, path, obj):
+        if "@values" not in obj:
+            raise ConditionError("@values is not passed")
+
+        values = obj["@values"]
+
+        if not isinstance(values, list):
+            raise ConditionError("@values should be a list")
+
+        if not values:
+            raise ConditionError("Empty @values")
+
+        for value in values:
+            if not isinstance(value, (str, unicode, int, float, bool)):
+                raise ConditionError("Bad @value")
+
+        condition = " OR ".join(["JSON_EXTRACT(`{0}`, %s) = %s".format(field)] * len(values))
+        result_values = []
+
+        for value in values:
+            result_values.append("$.\"{0}\"".format(path))
+            result_values.append(value)
+
+        return condition, result_values
 
 
 def format_conditions_json(field, args):
@@ -300,11 +326,25 @@ def format_conditions_json(field, args):
         "<=": ConditionFunctions.lass_or_equal_than,
         "!=": ConditionFunctions.not_equal,
         "between": ConditionFunctions.between,
+        "in": ConditionFunctions.in_set
     }
 
-    def parse_condition(obj):
+    def parse_condition(path, obj):
+        if isinstance(obj, bool):
+            return ConditionFunctions.equal(field, path, {
+                "@value": "true" if obj else "false"
+            })
+
         if isinstance(obj, (str, unicode, bool, float, int)):
-            return "= %s", [obj]
+            return ConditionFunctions.equal(field, path, {
+                "@value": obj
+            })
+
+        # if the value is the list, assume it's in_set @func
+        if isinstance(obj, list):
+            return ConditionFunctions.in_set(field, path, {
+                "@values": obj
+            })
 
         if isinstance(obj, dict):
             if "@func" in obj:
@@ -313,7 +353,7 @@ def format_conditions_json(field, args):
                 if cond not in functions:
                     raise ConditionError("Not allowed condition!")
 
-                return functions[cond](obj)
+                return functions[cond](field, path, obj)
 
         raise ConditionError("Bad value!")
 
@@ -324,17 +364,5 @@ def format_conditions_json(field, args):
         if not isinstance(arg, (str, unicode)):
             raise ConditionError("Bad condition: not a string")
 
-    tuples = [(key,) + parse_condition(value) for key, value in args.iteritems()]
-
-    conditions = [
-        """
-            CONVERT(JSON_EXTRACT(`{0}`, %s), CHAR(255)) {1}
-        """.format(field, condition)
-        for key, condition, data in tuples
-    ]
-
-    def values():
-        for key_, condition_, data_ in tuples:
-            yield ["$.\"{0}\"".format(key_)] + data_
-
-    return zip(conditions, list(values()))
+    result = [parse_condition(key, value) for key, value in args.iteritems()]
+    return result
