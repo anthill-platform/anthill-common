@@ -588,6 +588,8 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
                 raise jsonrpc.JsonRPCError(400, "Bad arguments: " + e.args[0])
             except StreamCommandError as e:
                 raise jsonrpc.JsonRPCError(e.code, e.message)
+            except ValidationError as e:
+                raise jsonrpc.JsonRPCError(400, e.message)
             except Exception as e:
                 raise jsonrpc.JsonRPCError(500, "Error: " + str(e))
 

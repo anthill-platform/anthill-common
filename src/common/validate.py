@@ -18,9 +18,33 @@ _str_name_pattern = re.compile("^([A-Za-z0-9_.-]+)+$")
 def validate(**fields):
     def wrapper1(method):
         def wrapper2(*args, **kwargs):
-            args_spec = inspect.getargspec(method)
 
-            # validate *args first
+            args_spec = inspect.getargspec(method)
+            _args = args_spec.args
+            _defaults = list(args_spec.defaults)
+
+            # this generator will return tuples (name, value) of *args
+            def _list_args():
+                for argument_value in args:
+                    argument_name = _args.pop(0)
+                    yield (argument_name, argument_value)
+
+            # this generator will return tuples (name, value) of **kwargs with their default values, of omitted
+            def _list_kwargs():
+                default_arguments_count = len(_defaults)
+                known, default = _args[:-default_arguments_count], _args[-default_arguments_count:]
+
+                for argument_name in known:
+                    try:
+                        argument_value = kwargs[argument_name]
+                    except KeyError:
+                        raise ValidationError("Unknown argument {0}".format(argument_name))
+
+                    yield (argument_name, argument_value)
+
+                for argument_name, default_value in zip(default, _defaults):
+                    yield (argument_name, kwargs.get(argument_name, default_value))
+
             def validate_arg(t):
                 field_name, field = t
                 validator_name = fields.get(field_name)
@@ -31,7 +55,6 @@ def validate(**fields):
                     raise ValidationError("No such validator {0}".format(validator_name))
                 return validator(field_name, field)
 
-            # then validate **kwargs
             def validate_kwarg(field_name, value):
                 validator_name = fields.get(field_name)
                 if not validator_name:
@@ -41,9 +64,9 @@ def validate(**fields):
                     raise ValidationError("No such validator {0}".format(validator_name))
                 return validator(field_name, value)
 
-            return method(*map(validate_arg, zip(args_spec.args, args)), **{
+            return method(*map(validate_arg, _list_args()), **{
                 field_name: validate_kwarg(field_name, field)
-                for field_name, field in kwargs.iteritems()
+                for field_name, field in _list_kwargs()
             })
 
         return wrapper2
@@ -126,6 +149,20 @@ def _int(field_name, field):
         raise ValidationError("Field {0} is not a valid number".format(field_name))
 
 
+def _bool(field_name, field):
+
+    if isinstance(field, bool):
+        return field
+
+    if isinstance(field, str):
+        return field == "true"
+
+    try:
+        return bool(field)
+    except (TypeError, ValueError):
+        raise ValidationError("Field {0} is not a valid bool".format(field_name))
+
+
 def _int_or_none(field_name, field):
     if field is None:
         return None
@@ -172,6 +209,7 @@ VALIDATORS = {
     "str_or_none": _str_or_none,
     "string": _str,
     "str_name": _str_name,
+    "bool": _bool,
     "load_json": _load_json,
     "load_json_dict": _load_json_dict,
     "load_json_dict_of_ints": _load_json_dict_of_ints

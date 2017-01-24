@@ -11,6 +11,7 @@ import tornado.ioloop
 from tornado.gen import coroutine, Return, is_future
 from tornado.web import HTTPError, RequestHandler
 from tornado.websocket import WebSocketClosedError
+from validate import ValidationError
 
 import access
 import internal
@@ -372,6 +373,8 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
                 raise jsonrpc.JsonRPCError(400, "Bad arguments: " + e.args[0])
             except jsonrpc.JsonRPCError as e:
                 raise e
+            except ValidationError as e:
+                raise jsonrpc.JsonRPCError(400, e.message)
             except Exception as e:
                 raise jsonrpc.JsonRPCError(500, "Error: " + str(e))
 
