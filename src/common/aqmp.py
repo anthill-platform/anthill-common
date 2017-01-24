@@ -415,11 +415,6 @@ class AMQPConnection(AMQPObject):
         """
         log = self._get_log('_run_async')
         try:
-            # log.debug('Run %s\n\twith args %s\n\tkwargs %s'\
-            #                '\n\ttimeout %s\n\tstore result in future %s'\
-            #                '\n\tand using callback %s (named %s)',
-            #                async_func, args, kwargs, timeout, future,
-            #                cb_func, callback_name)
             if args is None:
                 args = ()
             if kwargs is None:
@@ -466,8 +461,7 @@ class AMQPConnection(AMQPObject):
                     # noinspection PyShadowingNames
                     def _callback(*args, **kwargs):
                         log = self._get_log('_run_async._callback')
-                        # log.debug('Got response args=%s, kwargs=%s',
-                        #        args, kwargs)
+                        # log.debug('Got response args=%s, kwargs=%s', args, kwargs)
                         try:
                             cb_func(future, *args, **kwargs)
                         except TimeoutError:
@@ -1078,6 +1072,15 @@ class AMQPMessageDestination(AMQPObject):
         ))
 
 
+class AMQPQueueError(Exception):
+    def __init__(self, code, message):
+        self.code = code
+        self.message = message
+
+    def __str__(self):
+        return str(self.code) + ": " + self.message
+
+
 # noinspection PyProtectedMember
 class AMQPQueue(AMQPMessageDestination):
     """
@@ -1122,11 +1125,20 @@ class AMQPQueue(AMQPMessageDestination):
     @coroutine
     def declare(self, timeout=None):
         log = self._get_log('declare')
+
+        future = None
+
         # Are we declaring passively?
         if self._passive:
             # We are, declare using a temporary channel
             log.debug('Using temporary channel')
             ch = yield self._channel._connection.channel()
+
+            def closed(channel, code, reason):
+                if code != 0:
+                    future.set_exception(AMQPQueueError(code, reason))
+
+            ch.add_on_close_callback(closed)
         else:
             # We're not, use our own channel
             log.debug('Using own channel')
@@ -1135,7 +1147,7 @@ class AMQPQueue(AMQPMessageDestination):
         # Declare the queue in the channel
         try:
             log.debug('Declaring queue')
-            queue_res = yield ch.queue_declare(
+            future = ch.queue_declare(
                 queue=self._queue or '',
                 passive=self._passive,
                 durable=self._durable,
@@ -1144,14 +1156,15 @@ class AMQPQueue(AMQPMessageDestination):
                 nowait=self._nowait,
                 arguments=self._arguments,
                 timeout=timeout)
-            self._routing_key = queue_res.method.queue
-            log.debug('Queue is %s', self._routing_key)
-        except:
-            log.exception('Failed to declare queue (queue=%s)', self._queue)
 
-        # If we opened a temporary channel, close it
-        if self._passive and ch.is_open:
-            yield ch.close()
+            queue_res = yield future
+        finally:
+            # If we opened a temporary channel, close it
+            if self._passive and ch.is_open:
+                yield ch.close()
+
+        self._routing_key = queue_res.method.queue
+        log.debug('Queue is %s', self._routing_key)
 
         # If we were bound to things, re-bind
         for exchange, bindings in self._bindings.copy().iteritems():
@@ -1277,6 +1290,15 @@ class AMQPQueue(AMQPMessageDestination):
         raise Return(c)
 
 
+class AMQPExchangeError(Exception):
+    def __init__(self, code, message):
+        self.code = code
+        self.message = message
+
+    def __str__(self):
+        return str(self.code) + ": " + self.message
+
+
 # noinspection PyProtectedMember
 class AMQPExchange(AMQPMessageDestination):
     """
@@ -1323,11 +1345,20 @@ class AMQPExchange(AMQPMessageDestination):
     @coroutine
     def declare(self, timeout=None):
         log = self._get_log('declare')
+
+        future = None
+
         # Are we declaring passively?
         if self._passive:
             # We are, declare using a temporary channel
             log.debug('Using temporary channel')
             ch = yield self._channel._connection.channel()
+
+            def closed(channel, code, reason):
+                if code != 0:
+                    future.set_exception(AMQPExchangeError(code, reason))
+
+            ch.add_on_close_callback(closed)
         else:
             # We're not, use our own channel
             log.debug('Using own channel')
@@ -1336,7 +1367,7 @@ class AMQPExchange(AMQPMessageDestination):
         # Declare the queue in the channel
         try:
             log.debug('Declaring exchange')
-            yield ch.exchange_declare(
+            future = ch.exchange_declare(
                 exchange=self._exchange,
                 exchange_type=self._exchange_type,
                 passive=self._passive,
@@ -1346,14 +1377,14 @@ class AMQPExchange(AMQPMessageDestination):
                 nowait=self._nowait,
                 arguments=self._arguments,
                 timeout=timeout)
-            self._declared = True
-            log.debug('Exchange declared')
-        except:
-            log.exception('Failed to declare exchange %s', self._exchange)
 
-        # If we opened a temporary channel, close it
-        if self._passive and ch.is_open:
-            yield ch.close()
+            yield future
+        finally:
+            # If we opened a temporary channel, close it
+            if self._passive and ch.is_open:
+                yield ch.close()
+
+        self._declared = True
 
         # If we were bound to things, re-bind
         for exchange, bindings in self._bindings.copy().iteritems():
