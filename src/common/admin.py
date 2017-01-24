@@ -11,6 +11,7 @@ import base64
 from tornado.gen import coroutine, Return
 from tornado.web import HTTPError, stream_request_body
 from access import scoped, internal
+from validate import ValidationError
 
 """
   This module allows an 'admin' service to proceed administration on each service available across the environment.
@@ -209,6 +210,9 @@ class AdminUploadHandler(handler.AuthenticatedHandler):
     def put(self):
         try:
             result = yield self.action.receive_completed()
+        except ValidationError as e:
+            result = AdminController.render_error(e.message, [])
+            self.set_status(ACTION_ERROR, "Action-Error")
         except ActionError as e:
             result = AdminController.render_error(e.title, e.links)
             self.set_status(ACTION_ERROR, "Action-Error")
@@ -265,6 +269,9 @@ class AdminUploadHandler(handler.AuthenticatedHandler):
 
         try:
             yield self.action.receive_started(self.filename)
+        except ValidationError as e:
+            self.set_status(ACTION_ERROR, "Action-Error")
+            self.finish(e.message)
         except ActionError as e:
             self.set_status(ACTION_ERROR, "Action-Error")
             self.finish(e.title)
@@ -318,6 +325,9 @@ class AdminHandler(handler.AuthenticatedHandler):
             data = yield self.action.get(**self.action.context)
         except NotImplementedError:
             raise HTTPError(405, "Method not allowed.")
+        except ValidationError as e:
+            result = AdminController.render_error(e.message, [])
+            self.set_status(ACTION_ERROR, "Action-Error")
         except ActionError as e:
             result = AdminController.render_error(e.title, e.links)
             self.set_status(ACTION_ERROR, "Action-Error")
@@ -396,6 +406,9 @@ class AdminHandler(handler.AuthenticatedHandler):
         except ActionError as e:
             result = AdminController.render_error(e.title, e.links)
             self.set_status(ACTION_ERROR, "Action-Error")
+        except ValidationError as e:
+            result = AdminController.render_error(e.message, [])
+            self.set_status(ACTION_ERROR, "Action-Error")
         except Redirect as e:
 
             # special status 470 means redirect
@@ -444,6 +457,8 @@ class AdminWSActionConnection(handler.AuthenticatedWSHandler):
                 yield getattr(self, action)()
             except ActionError as e:
                 raise HTTPError(ACTION_ERROR, e.title)
+            except ValidationError as e:
+                raise HTTPError(ACTION_ERROR, e.message)
         else:
             raise HTTPError(400, "Bad action: " + action)
 
@@ -517,6 +532,8 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
             self.finish()
         except ActionError as e:
             raise HTTPError(400, e.title)
+        except ValidationError as e:
+            raise HTTPError(400, e.message)
 
     def required_scopes(self):
         return ["admin"]
