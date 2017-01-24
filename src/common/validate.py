@@ -2,6 +2,7 @@
 import ujson
 import inspect
 import re
+import logging
 
 
 class ValidationError(Exception):
@@ -21,7 +22,7 @@ def validate(**fields):
 
             args_spec = inspect.getargspec(method)
             _args = args_spec.args
-            _defaults = list(args_spec.defaults)
+            _defaults = list(args_spec.defaults or [])
 
             # this generator will return tuples (name, value) of *args
             def _list_args():
@@ -31,19 +32,16 @@ def validate(**fields):
 
             # this generator will return tuples (name, value) of **kwargs with their default values, of omitted
             def _list_kwargs():
-                default_arguments_count = len(_defaults)
-                known, default = _args[:-default_arguments_count], _args[-default_arguments_count:]
-
-                for argument_name in known:
+                for argument_name in _args:
                     try:
                         argument_value = kwargs[argument_name]
                     except KeyError:
-                        raise ValidationError("Unknown argument {0}".format(argument_name))
+                        if _defaults:
+                            argument_value = _defaults.pop(0)
+                        else:
+                            raise ValidationError("Unknown argument {0}".format(argument_name))
 
                     yield (argument_name, argument_value)
-
-                for argument_name, default_value in zip(default, _defaults):
-                    yield (argument_name, kwargs.get(argument_name, default_value))
 
             def validate_arg(t):
                 field_name, field = t
@@ -64,10 +62,16 @@ def validate(**fields):
                     raise ValidationError("No such validator {0}".format(validator_name))
                 return validator(field_name, value)
 
-            return method(*map(validate_arg, _list_args()), **{
+            result_args = map(validate_arg, _list_args())
+            result_kwargs = {
                 field_name: validate_kwarg(field_name, field)
                 for field_name, field in _list_kwargs()
-            })
+            }
+
+            logging.info("args -> {0} kwargs -> {1}".format(str(args), str(kwargs)))
+            logging.info("args = {0} kwargs = {1}".format(str(result_args), str(result_kwargs)))
+
+            return method(*result_args, **result_kwargs)
 
         return wrapper2
     return wrapper1
