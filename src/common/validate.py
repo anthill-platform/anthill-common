@@ -30,7 +30,7 @@ def validate(**fields):
                     argument_name = _args.pop(0)
                     yield (argument_name, argument_value)
 
-            # this generator will return tuples (name, value) of **kwargs with their default values, of omitted
+            # this generator will return tuples (name, value) of **kwargs with their default values, if omitted
             def _list_kwargs():
                 for argument_name in _args:
                     try:
@@ -67,9 +67,6 @@ def validate(**fields):
                 field_name: validate_kwarg(field_name, field)
                 for field_name, field in _list_kwargs()
             }
-
-            logging.info("args -> {0} kwargs -> {1}".format(str(args), str(kwargs)))
-            logging.info("args = {0} kwargs = {1}".format(str(result_args), str(result_kwargs)))
 
             return method(*result_args, **result_kwargs)
 
