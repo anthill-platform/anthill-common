@@ -50,7 +50,7 @@ class ActionError(Exception):
     If no links is passed, error will go like a small popup and user will be redirected to a previous page, is possible.
     """
     def __init__(self, title, error_links=None):
-        self.title = title
+        self.title = str(title)
         self.links = error_links
 
 
@@ -494,13 +494,6 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
 
     @coroutine
     def opened(self, *args, **kwargs):
-        yield self.action.opened(*args, **kwargs)
-
-    @internal
-    @coroutine
-    def prepared(self, *args, **kwargs):
-        yield super(AdminWSHandler, self).prepared()
-
         self.action = self.get_action(self.get_argument("action"))
 
         token = self.current_user.token
@@ -508,9 +501,7 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
         scopes = self.action.scopes_stream()
 
         if not token.has_scopes(scopes):
-            self.set_header("Need-Scopes", ",".join(scopes))
-            self.set_status(401)
-            self.write("Need to authorize.")
+            self.close(401, ",".join(scopes))
             return
 
         self.action.context = ujson.loads(self.get_argument("context"))
@@ -518,7 +509,8 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
         try:
             yield self.action.prepared(**self.action.context)
         except NotImplementedError:
-            raise HTTPError(405, "Method not allowed.")
+            self.close(105, "Method not allowed.")
+            return
         except RedirectStream as e:
 
             result = {
@@ -531,9 +523,14 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
             self.dumps(result)
             self.finish()
         except ActionError as e:
-            raise HTTPError(400, e.title)
+            self.close(400, e.title)
+            return
+        except StreamCommandError as e:
+            self.close(e.code, e.message)
+            return
         except ValidationError as e:
-            raise HTTPError(400, e.message)
+            self.close(400, e.message)
+            return
 
     def required_scopes(self):
         return ["admin"]
@@ -564,6 +561,9 @@ class StreamCommandError(Exception):
         self.code = code
         self.message = message
 
+    def __str__(self):
+        return str(self.code) + ": " + self.message
+
 
 # noinspection PyMethodMayBeStatic
 class StreamAdminController(AdminController, jsonrpc.JsonRPC):
@@ -580,7 +580,7 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
     def command_received(self, context, action, *args, **kwargs):
         if hasattr(self, action):
             if action.startswith("_"):
-                raise StreamCommandError(400, "Actions starting with underscore are not allowed!")
+                raise jsonrpc.JsonRPCError(400, "Actions starting with underscore are not allowed!")
 
             try:
                 response = yield getattr(self, action)(*args, **kwargs)
@@ -603,19 +603,11 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
         yield self.received(self, message)
 
     @coroutine
-    def opened(self, *args, **kwargs):
-        """
-        Called when connection is opened.
-        It's the websocets now, not a http connection, raising HTTPError won't help
-        """
-        pass
-
-    @coroutine
     def prepared(self, *args, **kwargs):
         """
         Called when the action is prepared.
         It's the last resort to throw an error here.
-        The code after this is not a http connection, but web sockets
+        It's the websockets now, not a http connection, raising HTTPError won't help
         """
         pass
 

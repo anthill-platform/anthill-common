@@ -2,7 +2,7 @@
 import ujson
 import inspect
 import re
-import logging
+from datetime import datetime
 
 
 class ValidationError(Exception):
@@ -200,6 +200,27 @@ def _str_name(field_name, field):
     return field
 
 
+def _str_datetime(field_name, field):
+    try:
+        datetime.strptime(field, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        raise ValidationError("Field {0} is not a valid date".format(field_name))
+    return field
+
+
+def _load_datetime(field_name, field):
+    try:
+        return datetime.strptime(field, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        raise ValidationError("Field {0} is not a valid date".format(field_name))
+
+
+def _datetime(field_name, field):
+    if not isinstance(field, datetime):
+        raise ValidationError("Field {0} is not a valid date".format(field_name))
+    return field
+
+
 VALIDATORS = {
     "json": _json,
     "json_dict": _json_dict,
@@ -210,6 +231,9 @@ VALIDATORS = {
     "str_or_none": _str_or_none,
     "string": _str,
     "str_name": _str_name,
+    "str_datetime": _str_datetime,
+    "load_datetime": _load_datetime,
+    "datetime": _datetime,
     "bool": _bool,
     "load_json": _load_json,
     "load_json_dict": _load_json_dict,
