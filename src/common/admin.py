@@ -487,7 +487,7 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
     @coroutine
     def closed(self):
         if self.action:
-            self.action.on_close()
+            yield self.action.closed()
 
     def on_message(self, message):
         tornado.ioloop.IOLoop.current().add_callback(self.action.on_message, message)
@@ -595,7 +595,8 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
 
             raise Return(response)
 
-    def on_close(self):
+    @coroutine
+    def closed(self):
         pass
 
     @coroutine
