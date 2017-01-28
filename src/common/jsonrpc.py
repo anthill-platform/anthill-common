@@ -152,11 +152,6 @@ class JsonRPC(object):
                     yield self.__write_error__(context, e.code, e.message, e.data, msg_id)
                     return
                 else:
-                    if response is None:
-                        yield self.__write_error__(context, -32603,
-                                                   "Internal error", "Response cannot be None", msg_id)
-                        return
-
                     yield self.respond(context, response, **payload)
             else:
                 yield self.__write_error__(context, -32603,
