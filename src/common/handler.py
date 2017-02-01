@@ -365,7 +365,7 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
     def command_received(self, context, action, *args, **kwargs):
         if hasattr(self, action):
             if action.startswith("_"):
-                raise HTTPError(400, "Actions starting with underscore are not allowed!")
+                raise jsonrpc.JsonRPCError(400, "No such action!")
 
             try:
                 response = yield getattr(self, action)(*args, **kwargs)
@@ -379,6 +379,8 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
                 raise jsonrpc.JsonRPCError(500, "Error: " + str(e))
 
             raise Return(response)
+        else:
+            raise jsonrpc.JsonRPCError(400, "No such action!")
 
     @coroutine
     def on_message(self, message):

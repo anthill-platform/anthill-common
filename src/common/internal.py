@@ -33,7 +33,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         super(Internal, self).__init__()
 
     @coroutine
-    def get(self, service, url, data, use_json=True, discover_service=True, timeout=20):
+    def get(self, service, url, data, use_json=True, discover_service=True, timeout=20, network="internal"):
         """
         Requests a http GET page.
 
@@ -44,11 +44,12 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         :param discover_service: if True, <service> argument is a service ID,
             if False, <service> is just server location.
         :param timeout: a request timeout in seconds
+        :param network: a network to make request in. Default is internal network
         :return: Requested data
         """
         if discover_service:
             try:
-                service_location = yield discover.cache.get_service(service)
+                service_location = yield discover.cache.get_service(service, network=network)
             except discover.DiscoveryError as e:
                 raise InternalError(404, "Failed to discover '{0}': ".format(service) + e.message)
         else:
@@ -109,7 +110,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         return content
 
     @coroutine
-    def post(self, service, url, data, use_json=True, discover_service=True, timeout=20):
+    def post(self, service, url, data, use_json=True, discover_service=True, timeout=20, network="internal"):
         """
         Posts a http request to a page.
 
@@ -120,11 +121,12 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         :param discover_service: if True, <service> argument is a service ID,
             if False, <service> is just server location.
         :param timeout: a request timeout in seconds
+        :param network: a network to make request in. Default is internal network
         :return: Requested data
         """
         if discover_service:
             try:
-                service_location = yield discover.cache.get_service(service)
+                service_location = yield discover.cache.get_service(service, network=network)
             except discover.DiscoveryError as e:
                 raise InternalError(404, "Failed to discover '{0}': " + e.message)
         else:
