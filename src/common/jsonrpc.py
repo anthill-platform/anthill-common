@@ -40,7 +40,7 @@ class JsonRPC(object):
 
     @staticmethod
     def __log_error__(code, message, data):
-        logging.error("Error " + str(code) + " " + message + ((". " + data) if data else ""))
+        logging.error("Error " + str(code) + " " + str(message) + ((". " + str(data)) if data else ""))
 
     @staticmethod
     def __parse_error__(error):
