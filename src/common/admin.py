@@ -848,7 +848,7 @@ def file_upload(title, action=""):
     }
 
 
-def form(title, fields, methods, data, icon=None, **context):
+def form(title, fields, methods, data, icon=None, id=None, **context):
     """
     Used by user to edit some data.
 
@@ -874,6 +874,7 @@ def form(title, fields, methods, data, icon=None, **context):
     :param methods: Dict of method buttons, each key represents form method
     :param data: (dict) Data passed to this field will be used by fields to fill-up the form.
     :param icon: (optional) Form icon
+    :param id: (optional) An ID for API usage
     :param context: (optional) Context may be used by fields.
     """
     f = {}
@@ -882,17 +883,19 @@ def form(title, fields, methods, data, icon=None, **context):
         f[field_id] = {"value": data.get(field_id, None)}
         f[field_id].update(_field)
 
-    return {
+    result = {
         "class": "form",
         "title": title,
         "fields": f,
         "icon": icon,
-
         "methods": {method_id: _method for method_id, _method in methods.iteritems()},
-
         "context": context
     }
 
+    if id:
+        result["id"] = id
+
+    return result
 
 def button(url, title, style, _method="get", **context):
     """
