@@ -43,6 +43,10 @@ def validate(**fields):
 
                     yield (argument_name, argument_value)
 
+                # give the rest kwargs not mentioned in validation
+                for argument_name, argument_value in kwargs.iteritems():
+                    yield (argument_name, argument_value)
+
             def validate_arg(t):
                 field_name, field = t
                 validator_name = fields.get(field_name)

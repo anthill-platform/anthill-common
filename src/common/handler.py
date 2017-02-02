@@ -154,6 +154,43 @@ class AuthenticatedHandlerMixin(object):
     def logout(self):
         self.clear_cookie("access_token")
 
+    def __token_needs_refresh__(self, token, db):
+        internal_ = internal.Internal()
+
+        try:
+            response = yield internal_.request(
+                token.get(access.AccessToken.ISSUER, "login"),
+                "refresh_token",
+                access_token=token.key)
+
+        except internal.InternalError as e:
+            logging.error(
+                "Failed to refresh an access token for user '{0}': {1} {2}".format(
+                    token.name,
+                    e.code,
+                    e.body))
+        else:
+
+            token = access.AccessToken(response["access_token"])
+
+            if token.is_valid():
+
+                token_cache = self.application.token_cache
+                if db is None:
+                    db = token_cache.acquire()
+
+                yield token_cache.store_token(db, token)
+
+                self.token_refreshed(token)
+
+                logging.info(
+                    "Refreshed an access token for user '{0}'".format(
+                        token.name))
+            else:
+                logging.error(
+                    "Refreshed token we've just got is not valid: {0}".format(
+                        token.key))
+
     @coroutine
     def prepare(self):
         token = AuthenticatedHandlerMixin.validate(
@@ -164,12 +201,11 @@ class AuthenticatedHandlerMixin(object):
                 self.get_cookie("access_token", None))
 
         token_cache = self.application.token_cache
-        db = None
 
-        try:
-            if token:
-                db = token_cache.acquire()
+        if token:
+            db = token_cache.acquire()
 
+            try:
                 valid = yield token_cache.validate_db(token, db=db)
 
                 if valid:
@@ -178,47 +214,17 @@ class AuthenticatedHandlerMixin(object):
                     self.token_invalidated(token)
                     token = None
 
-            if token and token.needs_refresh():
-                internal_ = internal.Internal()
+                if token:
+                    time_left = token.time_left()
 
-                try:
-                    response = yield internal_.request(
-                        token.get(access.AccessToken.ISSUER, "login"),
-                        "refresh_token",
-                        access_token=token.key)
+                    self.set_header("Access-Token-Time-Left", str(time_left))
 
-                except internal.InternalError as e:
+                    if token.needs_refresh():
+                        self.__token_needs_refresh__(token, db)
 
-                    logging.error(
-                        "Failed to refresh an access token for user '{0}': {1} {2}".format(
-                            token.name,
-                            e.code,
-                            e.body))
-                else:
-
-                    token = access.AccessToken(response["access_token"])
-
-                    if token.is_valid():
-
-                        token_cache = self.application.token_cache
-                        if db is None:
-                            db = token_cache.acquire()
-
-                        yield token_cache.store_token(db, token)
-
-                        self.token_refreshed(token)
-
-                        logging.info(
-                            "Refreshed an access token for user '{0}'".format(
-                                token.name))
-                    else:
-                        logging.error(
-                            "Refreshed token we've just got is not valid: {0}".format(
-                                token.key))
-
-        finally:
-            if db is not None:
-                yield db.release()
+            finally:
+                if db is not None:
+                    yield db.release()
 
         result = self.prepared(*self.path_args, **self.path_kwargs)
         if is_future(result):

@@ -170,6 +170,9 @@ class AccessToken:
         self.valid = True
         return True
 
+    def time_left(self):
+        return self.expiration_date - utc_time()
+
     def needs_refresh(self):
         if self.get(AccessToken.ISSUER) is None:
             return False
