@@ -195,7 +195,7 @@ class JsonRPC(object):
         pass
 
     @coroutine
-    def request(self, context, method, *args, **kwargs):
+    def request(self, context, method, timeout=JSONRPC_TIMEOUT, *args, **kwargs):
         msg_id = self.__get_next_id__()
         data, params = self.__generate_request__(method, *args, **kwargs)
 
@@ -207,7 +207,7 @@ class JsonRPC(object):
 
         # and wait for the response
         try:
-            result = yield with_timeout(datetime.timedelta(seconds=JSONRPC_TIMEOUT), future)
+            result = yield with_timeout(datetime.timedelta(seconds=timeout), future)
         except TimeoutError:
             # remove the handler if timed out
             self.handlers.pop(msg_id)

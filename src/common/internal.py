@@ -157,16 +157,14 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         raise Return(Internal.__parse_result__(result, use_json=use_json))
 
     @coroutine
-    def request(self, service, method, *args, **kwargs):
+    def request(self, service, method, timeout=jsonrpc.JSONRPC_TIMEOUT, *args, **kwargs):
         """
         Does
 
         :param service: Service ID the page is requested from
-        :param url: Last par of the request url
-        :param data: a disc to be converted to request arguments
-        :param use_json: whenever should the result be converted to json or not
-        :param discover_service: if True, <service> argument is a service ID,
-            if False, <service> is just server location.
+        :param method: Service Method to call (as described in internal handler)
+        :param args, kwargs: Arguments to send to the method
+        :param timeout: A timeout
         :return: Requested data
         """
 
@@ -185,7 +183,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
 
         timer = ElapsedTime("request -> {0}@{1}".format(method, service))
         try:
-            result = yield super(Internal, self).request(context, method, *args, **kwargs)
+            result = yield super(Internal, self).request(context, method, timeout, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:
             raise InternalError(e.code, e.message, e.data)
         except jsonrpc.JsonRPCTimeout:

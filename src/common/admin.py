@@ -10,6 +10,7 @@ import base64
 
 from tornado.gen import coroutine, Return
 from tornado.web import HTTPError, stream_request_body
+from tornado.websocket import WebSocketClosedError
 from access import scoped, internal
 from validate import ValidationError
 
@@ -618,7 +619,10 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
     @coroutine
     def write_data(self, context, data):
         if self.handler:
-            yield self.handler.write_message(data)
+            try:
+                yield self.handler.write_message(data)
+            except WebSocketClosedError:
+                raise jsonrpc.JsonRPCError(599, "Websocket closed")
 
 
 def link(url, title, icon=None, badge=None, **context):
