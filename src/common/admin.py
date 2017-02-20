@@ -495,6 +495,12 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
 
     @coroutine
     def opened(self, *args, **kwargs):
+        if self.action:
+            yield self.action.opened(**self.action.context)
+
+    @coroutine
+    def prepared(self, *args, **kwargs):
+
         self.action = self.get_action(self.get_argument("action"))
 
         token = self.current_user.token
@@ -510,7 +516,8 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
         try:
             yield self.action.prepared(**self.action.context)
         except NotImplementedError:
-            self.close(105, "Method not allowed.")
+            self.set_status(105, "Method not allowed.")
+            self.finish()
             return
         except RedirectStream as e:
 
@@ -524,13 +531,16 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
             self.dumps(result)
             self.finish()
         except ActionError as e:
-            self.close(400, e.title)
+            self.set_status(400, e.title)
+            self.finish()
             return
         except StreamCommandError as e:
-            self.close(e.code, e.message)
+            self.set_status(e.code, e.message)
+            self.finish()
             return
         except ValidationError as e:
-            self.close(400, e.message)
+            self.set_status(400, e.message)
+            self.finish()
             return
 
     def required_scopes(self):
@@ -608,8 +618,16 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
     def prepared(self, *args, **kwargs):
         """
         Called when the action is prepared.
-        It's the last resort to throw an error here.
-        It's the websockets now, not a http connection, raising HTTPError won't help
+        It's the last resort to throw a legit HTTP error here.
+        """
+        pass
+
+    @coroutine
+    def opened(self, *args, **kwargs):
+        """
+        Called when the action is already opened.
+        It's the websockets now, not a http connection, raising HTTPError won't help,
+            either close the connection with a code, or send 'error' object.
         """
         pass
 
