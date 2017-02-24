@@ -22,7 +22,12 @@ def validate(**fields):
 
             args_spec = inspect.getargspec(method)
             _args = args_spec.args
-            _defaults = list(args_spec.defaults or [])
+            _defaults_values = list(args_spec.defaults or [])
+
+            _defaults = {
+                _name: _value
+                for _name, _value in zip(reversed(_args), reversed(_defaults_values))
+            }
 
             # this generator will return tuples (name, value) of *args
             def _list_args():
@@ -36,8 +41,8 @@ def validate(**fields):
                     try:
                         argument_value = kwargs[argument_name]
                     except KeyError:
-                        if _defaults:
-                            argument_value = _defaults.pop(0)
+                        if argument_name in _defaults:
+                            argument_value = _defaults.pop(argument_name)
                         else:
                             raise ValidationError("Unknown argument {0}".format(argument_name))
 
