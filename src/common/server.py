@@ -245,13 +245,14 @@ class Server(tornado.web.Application):
         if len(listen_group) < 2:
             raise ServerError("Failed to listen on " + listen_uri + ": bad format")
 
-        kind, address = listen_group[0], listen_group[1]
+        kind, addresses = listen_group[0], listen_group[1:]
 
-        def listen_port(port):
-            self.http_server.listen(int(port), "127.0.0.1")
+        def listen_port(ports):
+            for port in ports:
+                self.http_server.listen(int(port), "127.0.0.1")
 
         def listen_unix(sockets):
-            for sock in sockets.split(":"):
+            for sock in sockets:
                 logging.info("Listening for socket: " + sock)
                 unix_socket = tornado.netutil.bind_unix_socket(sock, mode=0o777)
                 self.http_server.add_socket(unix_socket)
@@ -265,9 +266,9 @@ class Server(tornado.web.Application):
             raise ServerError("Failed to listen on " + listen_uri + ": unsupported kind")
 
         listen_method = kinds[kind]
-        listen_method(address)
+        listen_method(addresses)
 
-        logging.info("Listening '{0}' on '{1}'".format(kind, address))
+        logging.info("Listening '{0}' on '{1}'".format(kind, addresses))
         logging.info("Host is '{0}'".format(self.get_host()))
 
         tornado.ioloop.IOLoop.instance().add_callback(self.started)
