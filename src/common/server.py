@@ -250,10 +250,11 @@ class Server(tornado.web.Application):
         def listen_port(port):
             self.http_server.listen(int(port), "127.0.0.1")
 
-        def listen_unix(sock):
-            logging.info("Listening for socket: " + sock)
-            unix_socket = tornado.netutil.bind_unix_socket(sock, mode=0o777)
-            self.http_server.add_socket(unix_socket)
+        def listen_unix(sockets):
+            for sock in sockets.split(":"):
+                logging.info("Listening for socket: " + sock)
+                unix_socket = tornado.netutil.bind_unix_socket(sock, mode=0o777)
+                self.http_server.add_socket(unix_socket)
 
         kinds = {
             "port": listen_port,
