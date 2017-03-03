@@ -56,7 +56,7 @@ class Schedule(PeriodicCallback):
 
     def __run_coroutine__(self, callback, *args, **kwargs):
 
-        self.calls.pop(id(callback))
+        self.calls.pop(id(callback), None)
 
         IOLoop.current().add_callback(callback, *args, **kwargs)
 
