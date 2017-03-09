@@ -21,8 +21,9 @@ class Functions(object):
 
     @staticmethod
     def func_decrement(object_value, condition, value):
-        if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-            raise FuncError("Not a number")
+        if object_value is not None:
+            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
+                raise FuncError("Not a number")
         new_value = (object_value or 0) - value
         if new_value <= 0:
             raise FuncError("not_enough")
@@ -42,24 +43,27 @@ class Functions(object):
 
     @staticmethod
     def func_greater_equal_than(object_value, condition, value):
-        if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-            raise FuncError("Not a number")
+        if object_value is not None:
+            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
+                raise FuncError("Not a number")
         if (object_value or 0) < condition:
             raise FuncError("smaller")
         return value
 
     @staticmethod
     def func_greater_than(object_value, condition, value):
-        if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-            raise FuncError("Not a number")
+        if object_value is not None:
+            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
+                raise FuncError("Not a number")
         if (object_value or 0) <= condition:
             raise FuncError("smaller_or_equal")
         return value
 
     @staticmethod
     def func_increment(object_value, condition, value):
-        if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-            raise FuncError("Not a number")
+        if object_value is not None:
+            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
+                raise FuncError("Not a number")
         return (object_value or 0) + value
 
     @staticmethod
@@ -70,16 +74,18 @@ class Functions(object):
 
     @staticmethod
     def func_smaller_equal_than(object_value, condition, value):
-        if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-            raise FuncError("Not a number")
+        if object_value is not None:
+            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
+                raise FuncError("Not a number")
         if (object_value or 0) > condition:
             raise FuncError("greater")
         return value
 
     @staticmethod
     def func_smaller_than(object_value, condition, value):
-        if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-            raise FuncError("Not a number")
+        if object_value is not None:
+            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
+                raise FuncError("Not a number")
         if (object_value or 0) >= condition:
             raise FuncError("greater_or_equal")
         return value
