@@ -32,6 +32,7 @@ class ZMQInterProcess(JsonRPC):
 
     def __pre_init__(self):
         self.context = zmq.Context()
+        self.context.set(zmq.MAX_SOCKETS, 999999)
         self.socket = self.context.socket(zmq.PAIR)
 
     @coroutine
