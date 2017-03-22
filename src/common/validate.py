@@ -137,6 +137,18 @@ def _json_dict(field_name, field):
     return field
 
 
+def _json_list(field_name, field):
+    if not isinstance(field, list):
+        raise ValidationError("Field {0} is not a valid JSON list".format(field_name))
+
+    try:
+        ujson.dumps(field)
+    except TypeError:
+        raise ValidationError("Field {0} is not a valid JSON list".format(field_name))
+
+    return field
+
+
 def _json_dict_of_ints(field_name, field):
     try:
         ujson.dumps(field)
@@ -150,6 +162,36 @@ def _json_dict_of_ints(field_name, field):
         _str(name, name): _int(field_name + "." + name, value)
         for name, value in field.iteritems()
     }
+
+
+def _json_list_of_strings(field_name, field):
+    try:
+        ujson.dumps(field)
+    except (TypeError, ValueError):
+        raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
+
+    if not isinstance(field, list):
+        raise ValidationError("Field {0} is not a valid JSON list".format(field_name))
+
+    return [
+        _str(field_name, child)
+        for child in field
+    ]
+
+
+def _json_list_of_ints(field_name, field):
+    try:
+        ujson.dumps(field)
+    except (TypeError, ValueError):
+        raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
+
+    if not isinstance(field, list):
+        raise ValidationError("Field {0} is not a valid JSON list".format(field_name))
+
+    return [
+        _int(field_name, child)
+        for child in field
+    ]
 
 
 def _int(field_name, field):
@@ -233,7 +275,10 @@ def _datetime(field_name, field):
 VALIDATORS = {
     "json": _json,
     "json_dict": _json_dict,
+    "json_list": _json_list,
     "json_dict_of_ints": _json_dict_of_ints,
+    "json_list_of_strings": _json_list_of_strings,
+    "json_list_of_ints": _json_list_of_ints,
     "int": _int,
     "int_or_none": _int_or_none,
     "str": _str,
