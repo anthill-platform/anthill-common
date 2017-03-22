@@ -27,18 +27,32 @@ class FacebookAPI(common.social.SocialNetworkAPI):
             return None
 
     @coroutine
-    def api_auth(self, gamespace, key):
-
+    def api_auth(self, gamespace, key=None, code=None, redirect_uri=None):
         private_key = yield self.get_private_key(gamespace)
 
+        if code and not redirect_uri:
+            # when the code is passed, redirect_uri should also be passed
+            raise common.social.APIError(400, "missing_redirect_uri")
+
         try:
-            # exchange access token for long period
-            response = yield self.get("oauth/access_token", {
-                "client_id": private_key.app_id,
-                "client_secret": private_key.app_secret,
-                "grant_type": "fb_exchange_token",
-                "fb_exchange_token": key
-            })
+            if key:
+                # exchange access token for long period
+                response = yield self.get("oauth/access_token", {
+                    "client_id": private_key.app_id,
+                    "client_secret": private_key.app_secret,
+                    "grant_type": "fb_exchange_token",
+                    "fb_exchange_token": key
+                })
+            elif code:
+                # exchange a code instead
+                response = yield self.get("oauth/access_token", {
+                    "client_id": private_key.app_id,
+                    "client_secret": private_key.app_secret,
+                    "redirect_uri": redirect_uri,
+                    "code": code
+                })
+            else:
+                raise common.social.APIError(400, "no_code_or_key_defined")
         except tornado.httpclient.HTTPError as e:
             raise common.social.APIError(e.code, e.response.body if e.response else "")
         else:
@@ -74,7 +88,7 @@ class FacebookAPI(common.social.SocialNetworkAPI):
             raise Return(result)
 
     @coroutine
-    def api_get_user_info(self, gamespace, access_token=None, fields=None):
+    def api_get_user_info(self, gamespace, access_token=None, fields=None, parse=True):
 
         private_key = yield self.get_private_key(gamespace)
 
@@ -87,6 +101,10 @@ class FacebookAPI(common.social.SocialNetworkAPI):
         else:
 
             data = ujson.loads(response.body)
+
+            if not parse:
+                raise Return(data)
+
             raise Return(FacebookAPI.process_user_info(data))
 
     @coroutine
