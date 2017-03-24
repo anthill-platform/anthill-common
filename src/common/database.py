@@ -105,7 +105,7 @@ class Database(object):
 
     def __init__(self, host=None, database=None, user=None, password=None, *args, **kwargs):
         self.pool = tormysql.ConnectionPool(
-            max_connections=64,
+            max_connections=256,
             wait_connection_timeout=5,
             idle_seconds=7200,
             host=host,
