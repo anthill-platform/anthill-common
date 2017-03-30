@@ -56,10 +56,16 @@ class FacebookAPI(common.social.SocialNetworkAPI):
         except tornado.httpclient.HTTPError as e:
             raise common.social.APIError(e.code, e.response.body if e.response else "")
         else:
-            data = dict(urlparse.parse_qsl(response.body))
+            try:
+                data = ujson.loads(response.body)
+            except (KeyError, ValueError):
+                raise common.social.APIError(400, "corrupted_facebook_response")
 
-            access_token = data["access_token"]
-            expires_in = data["expires"]
+            try:
+                access_token = data["access_token"]
+                expires_in = data["expires_in"]
+            except KeyError:
+                raise common.social.APIError(400, "corrupted_facebook_response")
 
             result = common.social.AuthResponse(access_token=access_token, expires_in=expires_in, import_social=True)
             raise Return(result)
