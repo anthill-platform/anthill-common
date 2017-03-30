@@ -70,7 +70,10 @@ class ZMQInterProcess(JsonRPC):
     @coroutine
     def write_data(self, context, data):
         logging.debug("Sending: " + data)
-        yield Task(self.stream.send, data)
+        try:
+            yield Task(self.stream.send, data)
+        except IOError:
+            pass
 
 
 class ZMQPublisher(Publisher):
