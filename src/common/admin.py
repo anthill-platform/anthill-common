@@ -503,11 +503,9 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
 
         self.action = self.get_action(self.get_argument("action"))
 
-        token = self.current_user.token
-
         scopes = self.action.scopes_stream()
 
-        if not token.has_scopes(scopes):
+        if not self.current_user or not self.current_user.token.has_scopes(scopes):
             self.close(401, ",".join(scopes))
             return
 

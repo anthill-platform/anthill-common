@@ -2,6 +2,7 @@
 import pika
 
 from aqmp import AMQPConnection, AMQPQueue
+from pika.exceptions import ChannelClosed
 
 from tornado.gen import coroutine, Return, Future
 
@@ -188,8 +189,11 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
 
         logging.debug("Sending: {0} to {1} reply {2}".format(ujson.dumps(data), routing_key, reply_to))
 
-        yield channel.basic_publish(
-            exchange='',
-            routing_key=str(routing_key),
-            properties=properties,
-            body=ujson.dumps(data))
+        try:
+            yield channel.basic_publish(
+                exchange='',
+                routing_key=str(routing_key),
+                properties=properties,
+                body=ujson.dumps(data))
+        except ChannelClosed:
+            raise jsonrpc.JsonRPCError(503, "Channel is closed")
