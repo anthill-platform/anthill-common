@@ -6,6 +6,7 @@ import urllib
 import ujson
 import abc
 import logging
+import socket
 
 import common.social
 
@@ -59,6 +60,8 @@ class XsollaAPI(common.social.SocialNetworkAPI):
 
         try:
             result = yield self.client.fetch(request)
+        except socket.error as e:
+            raise common.social.APIError(500, "Connection error: " + e.message)
         except HTTPError as e:
             logging.info("Failed to POST xsolla " + str(e.response.body))
             raise common.social.APIError(e.code, e.message)
