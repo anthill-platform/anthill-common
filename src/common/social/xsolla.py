@@ -63,8 +63,14 @@ class XsollaAPI(common.social.SocialNetworkAPI):
         except socket.error as e:
             raise common.social.APIError(500, "Connection error: " + e.message)
         except HTTPError as e:
-            logging.info("Failed to POST xsolla " + str(e.response.body))
-            raise common.social.APIError(e.code, e.message)
+            try:
+                parsed = ujson.loads(e.response.body)
+            except (KeyError, ValueError):
+                raise common.social.APIError(e.code, "Internal API error")
+            else:
+                code = parsed.get("http_status_code", e.code)
+                message = parsed.get("message", "Internal API error")
+                raise common.social.APIError(code, message)
 
         try:
             response_object = ujson.loads(result.body)

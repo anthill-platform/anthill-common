@@ -23,7 +23,7 @@ class Discovery(object):
             raise Return({service_id: self.services[network + ":" + service_id] for service_id in services})
 
         if self.discovery_service is None:
-            raise DiscoveryError("Cannon fetch discovery service because it's None")
+            raise DiscoveryError(400, "Cannon fetch discovery service because it's None")
 
         required_also = [service_id for service_id in services if service_id not in self.services]
 
@@ -34,7 +34,7 @@ class Discovery(object):
                 discover_service=False)
 
         except internal.InternalError as e:
-            raise DiscoveryError("Discovery error: {0} {1}.".format(e.code, e.body))
+            raise DiscoveryError(e.code, "Discovery error: {0}.".format(e.code))
 
         self.services.update({
             (network + ":" + service_id): service_location
@@ -54,8 +54,7 @@ class Discovery(object):
             raise Return(self.services[record_id])
 
         if self.discovery_service is None:
-            raise DiscoveryError(
-                "Cannon fetch discovery service because it's None")
+            raise DiscoveryError(400, "Cannon fetch discovery service because it's None")
 
         try:
             response = yield self.internal.get(
@@ -69,12 +68,11 @@ class Discovery(object):
 
         except internal.InternalError as e:
             if e.code == 404:
-                raise DiscoveryError("404 No such service")
+                raise DiscoveryError(404, "No such service")
             elif e.code == 502:
-                raise DiscoveryError("502 Service is down")
+                raise DiscoveryError(502, "Service is down")
             else:
-                raise DiscoveryError("Discovery error: {0} {1}.".format(
-                    e.code, e.body))
+                raise DiscoveryError(e.code, "Discovery error: {0}.".format(e.body))
 
         self.services[record_id] = response
 
@@ -85,7 +83,8 @@ class Discovery(object):
 
 
 class DiscoveryError(Exception):
-    def __init__(self, message):
+    def __init__(self, code, message):
+        self.code = code
         self.message = message
 
     def __str__(self):

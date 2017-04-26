@@ -91,7 +91,7 @@ def cached(kv, h, ttl=300, lock=False, json=False):
     return wrapper1
 
 
-def retry(operation=None, max=3, delay=5):
+def retry(operation=None, max=3, delay=5, predicate=None):
     """
         Coroutine-friendly decorator to retry some operations:
         :param operation: operation name
@@ -110,6 +110,9 @@ def retry(operation=None, max=3, delay=5):
                 try:
                     result = yield method(*args, **kwargs)
                 except Exception as e:
+                    if predicate:
+                        if predicate(e):
+                            raise e
                     logging.error("Failed to '{0}': {1}, retrying...".format(operation, e.__class__.__name__))
                     counter -= 1
                     ext = e

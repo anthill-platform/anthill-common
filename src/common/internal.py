@@ -51,7 +51,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
             try:
                 service_location = yield discover.cache.get_service(service, network=network)
             except discover.DiscoveryError as e:
-                raise InternalError(404, "Failed to discover '{0}': ".format(service) + e.message)
+                raise InternalError(e.code, "Failed to discover '{0}': ".format(service) + e.message)
         else:
             service_location = service
 
@@ -128,7 +128,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
             try:
                 service_location = yield discover.cache.get_service(service, network=network)
             except discover.DiscoveryError as e:
-                raise InternalError(404, "Failed to discover '{0}': " + e.message)
+                raise InternalError(e.code, "Failed to discover '{0}': " + e.message)
         else:
             service_location = service
 
@@ -171,7 +171,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         try:
             service_broker = yield discover.cache.get_service(service, network="broker", version=False)
         except discover.DiscoveryError as e:
-            raise InternalError(500, e.message)
+            raise InternalError(e.code, e.message)
 
         max_connections = options.internal_max_connections
 
@@ -197,7 +197,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         try:
             service_broker = yield discover.cache.get_service(service, network="broker", version=False)
         except discover.DiscoveryError as e:
-            raise InternalError(500, e.message)
+            raise InternalError(e.code, e.message)
 
         max_connections = options.internal_max_connections
 
