@@ -44,7 +44,7 @@ def validate(**fields):
                         if argument_name in _defaults:
                             argument_value = _defaults.pop(argument_name)
                         else:
-                            raise ValidationError("Unknown argument {0}".format(argument_name))
+                            raise ValidationError("Argument {0} is not set".format(argument_name))
 
                     yield (argument_name, argument_value)
 
@@ -135,6 +135,13 @@ def _json_dict(field_name, field):
         raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
 
     return field
+
+
+def _json_dict_or_none(field_name, field):
+    if field is None:
+        return None
+
+    return _json_dict(field_name, field)
 
 
 def _json_list(field_name, field):
@@ -275,6 +282,7 @@ def _datetime(field_name, field):
 VALIDATORS = {
     "json": _json,
     "json_dict": _json_dict,
+    "json_dict_or_none": _json_dict_or_none,
     "json_list": _json_list,
     "json_dict_of_ints": _json_dict_of_ints,
     "json_list_of_strings": _json_list_of_strings,
