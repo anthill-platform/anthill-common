@@ -390,7 +390,10 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
 
     @coroutine
     def on_message(self, message):
-        yield self.received(self, message)
+        try:
+            yield self.received(self, message)
+        except jsonrpc.JsonRPCError as e:
+            pass
 
     # noinspection PyMethodOverriding
     @coroutine
