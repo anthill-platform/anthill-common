@@ -5,7 +5,7 @@ import logging
 import threading
 import weakref
 
-from tornado.gen import coroutine, Return
+from tornado.gen import coroutine, Return, Task
 
 import tornado
 import tornado.ioloop
@@ -354,7 +354,7 @@ class AMQPConnection(AMQPObject):
                 self._io_loop.add_timeout(
                     self._reconnect_delay, self._replace_connection)
                 log.error('Re-connecting in %s.',
-                                    self._reconnect_delay)
+                          self._reconnect_delay)
             elif self._giveup:
                 log.fatal('Giving up!')
                 for cb in self._on_giveup_cb:
@@ -1499,7 +1499,7 @@ class AMQPConsumer(AMQPObject):
         log = self._get_log('_consume')
         try:
             log.debug('Consuming queue %s', self._queue.routing_key)
-            result = yield self._channel.basic_consume(
+            result = self._channel.basic_consume(
                 consumer_callback=self._consumer_callback,
                 queue=self._queue.routing_key,
                 no_ack=self._no_ack,
@@ -1515,20 +1515,14 @@ class AMQPConsumer(AMQPObject):
 
     # noinspection PyUnusedLocal
     @coroutine
-    def cancel(self, nowait=False, arguments=None, timeout=None):
+    def cancel(self, nowait=False, timeout=None):
         log = self._get_log('cancel')
-        try:
-            log.debug('Cancelling consumer of queue %s', self._queue.routing_key)
-            yield self._channel.basic_cancel(
-                consumer_tag=self._consumer_tag_given,
-                nowait=nowait,
-                arguments=arguments)
-            self._consumer_tag = None
-            log.debug('Consumer is cancelled')
-        except:
-            log.exception('Failed to cancel consuming %s',
-                          self._queue.routing_key)
-            raise
+
+        log.debug('Cancelling consumer of queue %s', self._queue.routing_key)
+        yield Task(self._channel.basic_cancel, consumer_tag=self._consumer_tag_given, nowait=nowait)
+
+        self._consumer_tag = None
+        log.debug('Consumer is cancelled')
 
 
 class TimeoutError(Exception):
