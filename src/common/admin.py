@@ -163,7 +163,13 @@ class UploadAdminController(AdminController):
     Same as above, but with upload stream support
     """
     @coroutine
-    def receive_started(self, filename):
+    def receive_started(self, filename, args):
+        """
+        
+        :param filename: A name of the file being uploaded
+        :param args: Optional dict of key/value fields that may be passed during upload (see file_upload(fields={}))
+        :return: 
+        """
         pass
 
     @coroutine
@@ -259,6 +265,13 @@ class AdminUploadHandler(handler.AuthenticatedHandler):
         self.action = self.get_action(self.get_argument("action"))
         self.filename = self.request.headers.get("X-File-Name", "")
 
+        args = self.get_argument("args", "{}")
+
+        try:
+            args = ujson.loads(args)
+        except (KeyError, ValueError):
+            raise HTTPError(400, "Bad args field.")
+
         self.action.context = ujson.loads(self.get_argument("context"))
 
         scopes = self.action.access_scopes()
@@ -269,7 +282,7 @@ class AdminUploadHandler(handler.AuthenticatedHandler):
             raise HTTPError(401, "Need to authorize.")
 
         try:
-            yield self.action.receive_started(self.filename)
+            yield self.action.receive_started(self.filename, args)
         except ValidationError as e:
             self.set_status(ACTION_ERROR, "Action-Error")
             self.finish(e.message)
@@ -854,17 +867,28 @@ def breadcrumbs(items, title):
     }
 
 
-def file_upload(title, action=""):
+def file_upload(title, action="", fields=None, data=None):
     """
     File upload form. Has streaming support so big files can be uploaded.
     :param title: A title of the upload form
     :param action: Upload target action that will receive the file. Empty for current action.
             Please note, such action should be inherited from UploadAdminController
+    :param fields: A dict of fiends like in 'form' (useful when passing some arguments along with upload)
+    :param data: (dict) Data passed to this field will be used by fields to fill-up the form.
     """
+
+    f = {}
+
+    if fields:
+        for field_id, _field in fields.iteritems():
+            f[field_id] = {"value": data.get(field_id, None)}
+            f[field_id].update(_field)
+
     return {
         "class": "file_upload",
         "title": title,
-        "action": action
+        "action": action,
+        "fields": f
     }
 
 
