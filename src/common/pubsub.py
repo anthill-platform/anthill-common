@@ -83,6 +83,8 @@ class RabbitMQSubscriber(Subscriber):
         else:
             logging.error("Bad exchange name")
 
+        channel.basic_ack(delivery_tag=method.delivery_tag)
+
     @coroutine
     def release(self):
         yield self.connection.close()
@@ -90,10 +92,13 @@ class RabbitMQSubscriber(Subscriber):
     @coroutine
     def start(self):
 
-        self.connection = rabbitconn.RabbitMQConnection(self.broker, **self.settings)
+        self.connection = rabbitconn.RabbitMQConnection(
+            self.broker,
+            connection_name="pubsub." + self.name,
+            **self.settings)
         yield self.connection.wait_connect()
 
-        channel = yield self.connection.channel()
+        channel = yield self.connection.channel(prefetch_count=self.settings.get("channel_prefetch_count", 1024))
         self.queue = yield channel.queue(queue=QUEUE_PREFIX + self.name, auto_delete=True)
 
         for channel_name in self.channels:
@@ -105,13 +110,13 @@ class RabbitMQSubscriber(Subscriber):
 
         self.consumer = yield self.queue.consume(
             consumer_callback=self.__on_message__,
-            no_ack=True)
+            no_ack=False)
 
         yield super(RabbitMQSubscriber, self).start()
 
 
 class RabbitMQPublisher(Publisher):
-    def __init__(self, channels, broker, **settings):
+    def __init__(self, channels, broker, name, **settings):
         super(RabbitMQPublisher, self).__init__()
 
         self.channels = channels
@@ -120,6 +125,7 @@ class RabbitMQPublisher(Publisher):
         self.connection = None
         self.channel = None
         self.exchanges = {}
+        self.name = name
 
     @coroutine
     def publish(self, channel, payload):
@@ -142,6 +148,7 @@ class RabbitMQPublisher(Publisher):
         # connect
         self.connection = rabbitconn.RabbitMQConnection(
             self.broker,
+            connection_name="pubsub." + str(self.name),
             **self.settings)
 
         yield self.connection.wait_connect()

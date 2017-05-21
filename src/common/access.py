@@ -233,7 +233,8 @@ class AccessTokenCache(object):
         self.subscriber = pubsub.RabbitMQSubscriber(
             channels=[INVALIDATION_CHANNEL],
             name=options.name,
-            broker=options.pubsub)
+            broker=options.pubsub,
+            channel_prefetch_count=options.internal_channel_prefetch_count)
 
         self.kv = keyvalue.KeyValueStorage(
             host=options.token_cache_host,

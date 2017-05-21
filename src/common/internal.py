@@ -30,7 +30,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         self.internal_locations = map(ipaddr.IPNetwork, options.internal_restrict)
         self.broker = options.internal_broker
 
-        super(Internal, self).__init__()
+        super(Internal, self).__init__(options.internal_channel_prefetch_count)
 
     @coroutine
     def get(self, service, url, data, use_json=True, discover_service=True, timeout=20, network="internal"):
@@ -112,7 +112,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
     @coroutine
     def post(self, service, url, data, use_json=True, discover_service=True, timeout=20, network="internal"):
         """
-        Posts a http request to a page.
+        Posts a http request to a certain service
 
         :param service: Service ID the page is requested from
         :param url: Last par of the request url
@@ -159,13 +159,16 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
     @coroutine
     def request(self, service, method, timeout=jsonrpc.JSONRPC_TIMEOUT, *args, **kwargs):
         """
-        Does
+        Makes a RabbitMQ RPC request to a certain service.
 
         :param service: Service ID the page is requested from
         :param method: Service Method to call (as described in internal handler)
         :param args, kwargs: Arguments to send to the method
         :param timeout: A timeout
-        :return: Requested data
+        
+        :returns Request response from service from the other side
+        :raises InternalError on either connection issues or the requested service responded so
+        
         """
 
         try:
@@ -175,25 +178,38 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
 
         max_connections = options.internal_max_connections
 
-        broker = yield self.__get_connection__(
+        connection = yield self.__get_connection__(
             service_broker,
-            max_connections=max_connections)
+            max_connections=max_connections,
+            connection_name="request.{0}".format(service),
+            channel_prefetch_count=options.internal_channel_prefetch_count)
 
-        context = yield broker.__declare_queue__(service)
+        context = yield connection.__declare_queue__(service)
 
         timer = ElapsedTime("request -> {0}@{1}".format(method, service))
+
         try:
             result = yield super(Internal, self).request(context, method, timeout, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:
             raise InternalError(e.code, e.message, e.data)
         except jsonrpc.JsonRPCTimeout:
             raise InternalError(599, "Timed out for request {0}@{1}".format(method, service))
+
         logging.info(timer.done())
 
         raise Return(result)
 
     @coroutine
     def rpc(self, service, method, *args, **kwargs):
+        """
+        Unlike 'request' method, sends a simple RabbitMQ message to a certain service (no response is ever returned)
+
+        :param service: Service ID the page is requested from
+        :param method: Service Method to call (as described in internal handler)
+        :param args, kwargs: Arguments to send to the method
+        
+        """
+
         try:
             service_broker = yield discover.cache.get_service(service, network="broker", version=False)
         except discover.DiscoveryError as e:
@@ -201,11 +217,14 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
 
         max_connections = options.internal_max_connections
 
-        broker = yield self.__get_connection__(
+        connection = yield self.__get_connection__(
             service_broker,
-            max_connections=max_connections)
+            max_connections=max_connections,
+            connection_name="request.{0}".format(service),
+            channel_prefetch_count=options.internal_channel_prefetch_count)
 
-        context = yield broker.__declare_queue__(service)
+        context = yield connection.__declare_queue__(service)
+
         try:
             yield super(Internal, self).rpc(context, method, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:

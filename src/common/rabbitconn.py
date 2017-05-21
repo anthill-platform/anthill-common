@@ -5,6 +5,8 @@ from tornado.ioloop import IOLoop
 import pika
 import aqmp
 import logging
+import socket
+
 
 from abc import ABCMeta, abstractmethod
 
@@ -12,14 +14,20 @@ from abc import ABCMeta, abstractmethod
 class RabbitMQConnection(aqmp.AMQPConnection):
 
     SOCKET_TIMEOUT = 1.0
+    CHANNEL_DEFAULT_PREFETCH_COUNT = 1024
 
-    def __init__(self, broker, **kwargs):
+    def __init__(self, broker, connection_name=None, channel_prefetch_count=CHANNEL_DEFAULT_PREFETCH_COUNT, **kwargs):
 
         self.connected = Future()
 
         params = pika.URLParameters(broker)
-
         params.socket_timeout = RabbitMQConnection.SOCKET_TIMEOUT
+
+        self.connection_name = connection_name
+        if connection_name:
+            params.client_properties = {
+                "connection_name": connection_name
+            }
 
         super(RabbitMQConnection, self).__init__(
             params,
@@ -29,18 +37,31 @@ class RabbitMQConnection(aqmp.AMQPConnection):
             **kwargs
         )
 
-        self.channel_pool = RabbitMQChannelPool(self)
+        self.channel_pool = RabbitMQChannelPool(
+            self,
+            channel_prefetch_count=channel_prefetch_count)
 
     @coroutine
-    def __connected__(self, *args, **kwargs):
-        logging.info("Connected to rabbitmq!")
+    def __connected__(self, connection, *args, **kwargs):
+
+        try:
+            sock_name = str(connection.socket.getsockname())
+        except socket.error:
+            sock_name = "Unknown"
+            pass
+
+        logging.info("Connected to rabbitmq: {0}".format(
+            str(sock_name) + " " + self.connection_name if self.connection_name else str(sock_name)
+        ))
         if self.connected:
             self.connected.set_result(True)
         self.connected = None
 
     @coroutine
-    def __closed__(self, *args, **kwargs):
-        logging.error("Connection lost!")
+    def __closed__(self, connection, *args, **kwargs):
+        logging.info("Connection lost: {0}".format(
+            self.connection_name if self.connection_name else str(connection)
+        ))
 
     @coroutine
     def wait_connect(self):
@@ -50,8 +71,8 @@ class RabbitMQConnection(aqmp.AMQPConnection):
     def with_channel(self):
         return self.channel_pool.with_channel()
 
-    def acquire_channel(self):
-        return self.channel_pool.acquire()
+    def acquire_channel(self, *args, **kwargs):
+        return self.channel_pool.acquire(*args, **kwargs)
 
     def release_channel(self, channel):
         self.channel_pool.release(channel)
@@ -98,8 +119,9 @@ class RoundRobinPool(list):
 
 
 class RabbitMQConnectionPool(RoundRobinPool):
-    def __init__(self, broker, max_connections, **kwargs):
-        super(RabbitMQConnectionPool, self).__init__(max_connections, broker=broker, **kwargs)
+    def __init__(self, broker, max_connections, connection_name=None, **kwargs):
+        super(RabbitMQConnectionPool, self).__init__(
+            max_connections, broker=broker, connection_name=connection_name, **kwargs)
 
     @coroutine
     def __new_object__(self, **kwargs):
@@ -121,17 +143,26 @@ class RabbitMQPooledChannel(object):
 
 
 class RabbitMQChannelPool(object):
-    def __init__(self, connection, **kwargs):
+    def __init__(self, connection, channel_prefetch_count=RabbitMQConnection.CHANNEL_DEFAULT_PREFETCH_COUNT, **kwargs):
         self.connection = connection
         self.channels = list()
+        self.channel_prefetch_count = channel_prefetch_count
 
     @coroutine
-    def acquire(self):
-        if self.channels:
-            raise Return(self.channels.pop(0))
+    def acquire(self, *args, **kwargs):
+        while self.channels:
+            channel = self.channels.pop(0)
 
-        channel = yield self.connection.channel()
+            # get the first working channel
+            if channel.is_open:
+                raise Return(channel)
+
+        channel = yield self.connection.channel(prefetch_count=self.channel_prefetch_count, *args, **kwargs)
+
         raise Return(channel)
+
+    def clear(self):
+        self.channels = list()
 
     @coroutine
     def with_channel(self):

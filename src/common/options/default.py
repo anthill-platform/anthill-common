@@ -23,6 +23,12 @@ define("internal_max_connections",
        group="internal",
        type=int)
 
+define("internal_channel_prefetch_count",
+       default=1024,
+       help="Channel prefetch for internal broker (how many a consumer may prefetch for processing).",
+       group="internal",
+       type=int)
+
 # Token cache
 
 define("token_cache_host",

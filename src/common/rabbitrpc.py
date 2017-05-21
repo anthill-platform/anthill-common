@@ -19,28 +19,48 @@ Asynchronous JSON-RPC protocol implementation for RabbitMQ. See http://www.jsonr
 
 
 class Context(object):
-    def __init__(self, channel, routing_key=None, reply_to=None):
+    def __init__(self, channel=None, routing_key=None, reply_to=None):
         self.channel = channel
         self.routing_key = routing_key or (lambda: None)
         self.reply_to = reply_to or (lambda: None)
+        self.return_future = None
 
 
 class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
     @coroutine
     def __declare_queue__(self, name):
-        if name in self.named_channels:
-            raise Return(self.named_channels[name])
+        context = self.named_channels.get(name)
+        if context:
+            if context.channel.is_open:
+                raise Return(context)
+            else:
+                del self.named_channels[name]
+                self.queues.pop(name, None)
+
+        context = Context(channel=None, routing_key=None, reply_to=None)
+
+        def on_return_callback(ch, method, properties, body):
+            if context.return_future:
+                if method.reply_code:
+                    context.return_future.set_exception(jsonrpc.JsonRPCError(method.reply_code, method.reply_text))
+                context.return_future = None
+
+        def confirm_delivery(method):
+            if context.return_future:
+                context.return_future.set_result(True)
+                context.return_future = None
 
         try:
-            channel = yield self.acquire_channel()
+            channel = yield self.acquire_channel(on_return_callback=on_return_callback,
+                                                 confirm_delivery=confirm_delivery)
         except Exception as e:
             raise jsonrpc.JsonRPCError(500, "Failed to acquire a channel: " + e.message)
 
         callback_queue = yield channel.queue(exclusive=True)
 
-        context = Context(channel,
-                          routing_key=lambda: "rpc." + name,
-                          reply_to=lambda: callback_queue.routing_key)
+        context.channel = channel
+        context.routing_key = lambda: "rpc." + name
+        context.reply_to = lambda: callback_queue.routing_key
 
         self.named_channels[name] = context
         self.queues[name] = callback_queue
@@ -53,8 +73,8 @@ class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
 
         raise Return(context)
 
-    def __init__(self, mq, broker, **kwargs):
-        super(JsonAMQPConnection, self).__init__(broker, **kwargs)
+    def __init__(self, mq, broker, connection_name=None, **kwargs):
+        super(JsonAMQPConnection, self).__init__(broker, connection_name, **kwargs)
         self.named_channels = {}
         self.queues = {}
         self.consumers = {}
@@ -62,14 +82,15 @@ class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
 
 
 class JsonAMQPConnectionPool(rabbitconn.RoundRobinPool):
-    def __init__(self, mq, broker, max_connections, **kwargs):
+    def __init__(self, mq, broker, max_connections, connection_name=None, **kwargs):
         super(JsonAMQPConnectionPool, self).__init__(max_connections, **kwargs)
         self.mq = mq
         self.broker = broker
+        self.connection_name = connection_name
 
     @coroutine
     def __new_object__(self, **kwargs):
-        connection = JsonAMQPConnection(self.mq, self.broker, **kwargs)
+        connection = JsonAMQPConnection(self.mq, self.broker, self.connection_name, **kwargs)
         yield connection.wait_connect()
 
         logging.debug("New connection constructed in a pool")
@@ -85,7 +106,8 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
             connection = yield pool.get()
             raise Return(connection)
 
-        pool = JsonAMQPConnectionPool(self, broker, max_connections=max_connections, **kwargs)
+        pool = JsonAMQPConnectionPool(
+            self, broker, max_connections=max_connections, **kwargs)
 
         logging.debug("New connection pool created: " + broker)
 
@@ -98,6 +120,24 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
     @coroutine
     def __on_connected__(self, *args, **kwargs):
         pass
+
+    @coroutine
+    def __callback_request__(self, channel, method, properties, body):
+        payload = {}
+
+        if properties.correlation_id:
+            try:
+                payload["id"] = int(properties.correlation_id or "-1")
+            except ValueError:
+                logging.error("Bad correlation id received: " + str(properties.correlation_id))
+                # ignore that message
+                return
+
+        context = Context(self.listen_channel,
+                          routing_key=lambda: str(properties.reply_to),
+                          reply_to=lambda: self.callback_queue.routing_key)
+
+        yield self.received(context, body, **payload)
 
     @coroutine
     def __incoming_request__(self, channel, method, properties, body):
@@ -117,7 +157,10 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
 
         yield self.received(context, body, **payload)
 
-    def __init__(self):
+        # acknowledge the request is processed
+        channel.basic_ack(delivery_tag=method.delivery_tag)
+
+    def __init__(self, channel_prefetch_count=1024):
         super(RabbitMQJsonRPC, self).__init__()
 
         self.req_channel = None
@@ -131,13 +174,19 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         self.callback_queue = None
         self.handler_consumer = None
         self.callback_consumer = None
+        self.channel_prefetch_count = channel_prefetch_count
 
     @coroutine
     def listen(self, broker, internal_name, on_receive):
-        self.listen_connection = JsonAMQPConnection(self, broker)
+        self.listen_connection = JsonAMQPConnection(
+            self,
+            broker,
+            connection_name="rpc." + internal_name,
+            channel_prefetch_count = self.channel_prefetch_count)
+
         yield self.listen_connection.wait_connect()
 
-        self.listen_channel = yield self.listen_connection.channel()
+        self.listen_channel = yield self.listen_connection.channel(prefetch_count=self.channel_prefetch_count)
 
         # initial incoming request queue
 
@@ -159,10 +208,10 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
 
         self.handler_consumer = yield self.handler_queue.consume(
             consumer_callback=self.__incoming_request__,
-            no_ack=True)
+            no_ack=False)
 
         self.callback_consumer = yield self.callback_queue.consume(
-            consumer_callback=self.__incoming_request__,
+            consumer_callback=self.__callback_request__,
             no_ack=True)
 
         self.set_receive(on_receive)
@@ -184,16 +233,23 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
 
         properties = pika.BasicProperties(
             correlation_id=correlation_id,
-            reply_to=str(reply_to)
+            reply_to=str(reply_to),
+            delivery_mode=1
         )
 
         logging.debug("Sending: {0} to {1} reply {2}".format(ujson.dumps(data), routing_key, reply_to))
+
+        f = Future()
+        context.return_future = f
 
         try:
             yield channel.basic_publish(
                 exchange='',
                 routing_key=str(routing_key),
                 properties=properties,
-                body=ujson.dumps(data))
+                body=ujson.dumps(data),
+                mandatory=True)
         except ChannelClosed:
             raise jsonrpc.JsonRPCError(503, "Channel is closed")
+        else:
+            yield f

@@ -248,11 +248,16 @@ class AMQPConnection(AMQPObject):
         return [ch() for ch in self._channels]
 
     @coroutine
-    def channel(self, channel_number=None, timeout=None):
+    def channel(self, channel_number=None, timeout=None, prefetch_count=None,
+                on_close_callback=None, on_return_callback=None,
+                on_cancel_callback=None, on_flow_callback=None, confirm_delivery=None):
         """
         Open a new channel on the AMQP connection.
         """
-        ch = AMQPChannel(self, channel_number)
+        ch = AMQPChannel(self, channel_number, prefetch_count,
+                         on_close_callback, on_return_callback, on_cancel_callback,
+                         on_flow_callback, confirm_delivery)
+
         yield ch._init_channel(timeout)
         self._cleanup_channels()
         self._channels.append(weakref.ref(ch))
@@ -602,7 +607,9 @@ class AMQPChannel(AMQPObject):
     An abstraction for the AMQP Channel.
     """
 
-    def __init__(self, connection, channel_number):
+    def __init__(self, connection, channel_number, prefetch_count,
+                 on_close_callback=None, on_return_callback=None,
+                 on_cancel_callback=None, on_flow_callback=None, confirm_delivery=None):
         """
         Initialise a new channel object.
         """
@@ -610,6 +617,12 @@ class AMQPChannel(AMQPObject):
         log.debug('New channel')
         self._connection = connection
         self._channel_number = channel_number
+        self._prefetch_count = prefetch_count
+        self._on_close_callback = on_close_callback
+        self._on_return_callback = on_return_callback
+        self._on_cancel_callback = on_cancel_callback
+        self._on_flow_callback = on_flow_callback
+        self._confirm_delivery = confirm_delivery
         self._channel = None
 
         # Queues and exchanges to re-establish
@@ -651,6 +664,22 @@ class AMQPChannel(AMQPObject):
             raise
 
         self._channel = channel
+
+        if self._prefetch_count:
+            yield self.basic_qos(prefetch_count=self._prefetch_count)
+
+        # a set of callbacks that will stay up to date even if reconnection took place
+
+        if self._on_close_callback:
+            self._channel.add_on_close_callback(self._on_close_callback)
+        if self._on_return_callback:
+            self._channel.add_on_return_callback(self._on_return_callback)
+        if self._on_cancel_callback:
+            self._channel.add_on_cancel_callback(self._on_cancel_callback)
+        if self._on_flow_callback:
+            self._channel.add_on_flow_callback(self._on_flow_callback)
+        if self._confirm_delivery:
+            self._channel.confirm_delivery(self._confirm_delivery, nowait=True)
 
         # If we had any exchanges, declare those now
         for ex in filter(bool, self._get_exchanges()):
@@ -1178,7 +1207,8 @@ class AMQPQueue(AMQPMessageDestination):
 
         # If we have any consumers, re-start those
         for c in self._get_consumers():
-            yield c.consume(timeout)
+            if c:
+                yield c.consume(timeout)
 
     # noinspection PyBroadException
     @coroutine
