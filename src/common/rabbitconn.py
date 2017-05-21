@@ -14,9 +14,8 @@ from abc import ABCMeta, abstractmethod
 class RabbitMQConnection(aqmp.AMQPConnection):
 
     SOCKET_TIMEOUT = 1.0
-    CHANNEL_DEFAULT_PREFETCH_COUNT = 1024
 
-    def __init__(self, broker, connection_name=None, channel_prefetch_count=CHANNEL_DEFAULT_PREFETCH_COUNT, **kwargs):
+    def __init__(self, broker, connection_name=None, channel_prefetch_count=0, **kwargs):
 
         self.connected = Future()
 
@@ -143,7 +142,7 @@ class RabbitMQPooledChannel(object):
 
 
 class RabbitMQChannelPool(object):
-    def __init__(self, connection, channel_prefetch_count=RabbitMQConnection.CHANNEL_DEFAULT_PREFETCH_COUNT, **kwargs):
+    def __init__(self, connection, channel_prefetch_count=0, **kwargs):
         self.connection = connection
         self.channels = list()
         self.channel_prefetch_count = channel_prefetch_count

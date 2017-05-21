@@ -30,7 +30,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         self.internal_locations = map(ipaddr.IPNetwork, options.internal_restrict)
         self.broker = options.internal_broker
 
-        super(Internal, self).__init__(options.internal_channel_prefetch_count)
+        super(Internal, self).__init__()
 
     @coroutine
     def get(self, service, url, data, use_json=True, discover_service=True, timeout=20, network="internal"):

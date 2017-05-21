@@ -122,24 +122,6 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         pass
 
     @coroutine
-    def __callback_request__(self, channel, method, properties, body):
-        payload = {}
-
-        if properties.correlation_id:
-            try:
-                payload["id"] = int(properties.correlation_id or "-1")
-            except ValueError:
-                logging.error("Bad correlation id received: " + str(properties.correlation_id))
-                # ignore that message
-                return
-
-        context = Context(self.listen_channel,
-                          routing_key=lambda: str(properties.reply_to),
-                          reply_to=lambda: self.callback_queue.routing_key)
-
-        yield self.received(context, body, **payload)
-
-    @coroutine
     def __incoming_request__(self, channel, method, properties, body):
         payload = {}
 
@@ -157,10 +139,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
 
         yield self.received(context, body, **payload)
 
-        # acknowledge the request is processed
-        channel.basic_ack(delivery_tag=method.delivery_tag)
-
-    def __init__(self, channel_prefetch_count=1024):
+    def __init__(self):
         super(RabbitMQJsonRPC, self).__init__()
 
         self.req_channel = None
@@ -174,19 +153,17 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         self.callback_queue = None
         self.handler_consumer = None
         self.callback_consumer = None
-        self.channel_prefetch_count = channel_prefetch_count
 
     @coroutine
     def listen(self, broker, internal_name, on_receive):
         self.listen_connection = JsonAMQPConnection(
             self,
             broker,
-            connection_name="rpc." + internal_name,
-            channel_prefetch_count = self.channel_prefetch_count)
+            connection_name="rpc." + internal_name)
 
         yield self.listen_connection.wait_connect()
 
-        self.listen_channel = yield self.listen_connection.channel(prefetch_count=self.channel_prefetch_count)
+        self.listen_channel = yield self.listen_connection.channel()
 
         # initial incoming request queue
 
@@ -208,10 +185,10 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
 
         self.handler_consumer = yield self.handler_queue.consume(
             consumer_callback=self.__incoming_request__,
-            no_ack=False)
+            no_ack=True)
 
         self.callback_consumer = yield self.callback_queue.consume(
-            consumer_callback=self.__callback_request__,
+            consumer_callback=self.__incoming_request__,
             no_ack=True)
 
         self.set_receive(on_receive)
