@@ -216,9 +216,6 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
 
         logging.debug("Sending: {0} to {1} reply {2}".format(ujson.dumps(data), routing_key, reply_to))
 
-        f = Future()
-        context.return_future = f
-
         try:
             yield channel.basic_publish(
                 exchange='',
@@ -228,5 +225,3 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
                 mandatory=True)
         except ChannelClosed:
             raise jsonrpc.JsonRPCError(503, "Channel is closed")
-        else:
-            yield f
