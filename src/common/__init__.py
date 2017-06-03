@@ -187,3 +187,55 @@ class SyncTimeout():
 
     def raise_timeout(self, *args):
         raise SyncTimeout.TimeoutError()
+
+
+class MetaEnum(type):
+    # noinspection PyUnresolvedReferences
+    def __contains__(cls, x):
+            return x in cls.ALL
+
+
+class Enum(object):
+    __metaclass__ = MetaEnum
+    ALL = {}
+
+    def __init__(self, method):
+        self.method = str(method).lower()
+
+    def __eq__(self, o):
+        return self.method == o
+
+    def __ne__(self, o):
+        return self.method != o
+
+    def __str__(self):
+        return self.method
+
+
+class Flags(object):
+    def __init__(self, flags=None):
+        if flags:
+            if isinstance(flags, (set, list,)):
+                self._flags = set(filter(lambda flag: isinstance(flag, (str, unicode,)), flags))
+            else:
+                self._flags = set()
+        else:
+            self._flags = set()
+
+    def __contains__(self, key):
+        return key in self._flags
+
+    def __str__(self):
+        return ",".join(self._flags)
+
+    def set(self, flag):
+        self._flags.add(flag)
+
+    def clear(self, flag):
+        self._flags.remove(flag)
+
+    def dump(self):
+        return ",".join(self._flags)
+
+    def as_list(self):
+        return list(self._flags)

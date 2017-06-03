@@ -4,7 +4,7 @@ import pika
 from aqmp import AMQPConnection, AMQPQueue
 from pika.exceptions import ChannelClosed
 
-from tornado.gen import coroutine, Return, Future
+from tornado.gen import coroutine, Return, Future, with_timeout, TimeoutError
 
 import jsonrpc
 import rabbitconn
@@ -12,6 +12,7 @@ import rabbitconn
 import tornado.ioloop
 import logging
 import ujson
+import datetime
 
 """
 Asynchronous JSON-RPC protocol implementation for RabbitMQ. See http://www.jsonrpc.org/specification
@@ -155,13 +156,17 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         self.callback_consumer = None
 
     @coroutine
-    def listen(self, broker, internal_name, on_receive):
+    def listen(self, broker, internal_name, on_receive, timeout=10):
         self.listen_connection = JsonAMQPConnection(
             self,
             broker,
             connection_name="rpc." + internal_name)
 
-        yield self.listen_connection.wait_connect()
+        try:
+            yield with_timeout(datetime.timedelta(seconds=timeout),
+                               self.listen_connection.wait_connect())
+        except TimeoutError:
+            raise jsonrpc.JsonRPCError(500, "Failed to connect to the RabbitMQ")
 
         self.listen_channel = yield self.listen_connection.channel()
 

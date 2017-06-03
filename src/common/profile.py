@@ -21,6 +21,11 @@ class Functions(object):
 
     @staticmethod
     def func_decrement(object_value, condition, value):
+        """
+        Function that decrements Profile's value by '@value' field. For example, this object:
+        
+        { "a": 10 } after applying the function { "@func": "--", "@value": 5 } to it will be updated to be: { "a": 5 }
+        """
         if object_value is not None:
             if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
                 raise FuncError("Not a number")
@@ -31,18 +36,55 @@ class Functions(object):
 
     @staticmethod
     def func_equal(object_value, condition, value):
+        """
+        Function that ensures the field is equal to '@value' field. if not, update will fail with error:
+        
+        { "a": 10 } after applying the function { "@func": "==", "@value": 9 } to it will fail with FuncError, but
+            after applying the function { "@func": "==", "@value": 10 } nothing will happen.
+            
+        This function along with other is useful to make certain operation only if certain requirement is met.
+        """
         if object_value != condition:
             raise FuncError("not_equal")
         return value
 
     @staticmethod
     def func_exists(object_value, condition, value):
+        """
+        Function that ensures the field exists. if not, update will fail with error:
+        
+        { "a": 10 }
+        
+        This update:
+        
+        { 
+            "b": { "@func": "exists" }
+        }
+        
+        will fail with FuncError, but this one:
+        
+        { 
+            "a": { "@func": "exists" }
+        }
+        
+        wont.
+            
+        This function along with other is useful to make certain operation only if certain requirement is met.
+        """
         if object_value is None:
             raise FuncError("not_exists")
         return object_value
 
     @staticmethod
     def func_greater_equal_than(object_value, condition, value):
+        """
+        Function that ensures the field is >= to '@value' field. if not, update will fail with error:
+        
+        { "a": 8 } after applying the function { "@func": ">=", "@value": 9 } to it will fail with FuncError, but
+            after applying the function { "@func": ">=", "@value": 7 } nothing will happen.
+            
+        This function along with other is useful to make certain operation only if certain requirement is met.
+        """
         if object_value is not None:
             if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
                 raise FuncError("Not a number")
@@ -61,6 +103,11 @@ class Functions(object):
 
     @staticmethod
     def func_increment(object_value, condition, value):
+        """
+        Function that increments Profile's value by '@value' field. For example, this object:
+        
+        { "a": 10 } after applying the function { "@func": "++", "@value": 5 } will be updated to be: { "a": 15 }
+        """
         if object_value is not None:
             if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
                 raise FuncError("Not a number")
@@ -110,6 +157,73 @@ class NoDataError(Exception):
 
 
 class Profile(object):
+
+    """
+    A class that represents abstract Profile.
+    
+    Profile is a JSON object that can be tied to various entities (such as users, groups, or even leaderboard records)
+        and then be used in context of that entities as their profile (for example, a User Profile would be a Profile
+        object of the certain user).
+        
+    The associated IDs should be assigned to the Profile object during creation of that Profile object:
+            
+    class SomeProfile(Profile):
+        def __init__(self, db, gamespace_id, some_id):
+            super(Profile, self).__init__(db)
+            self.gamespace_id = gamespace_id
+            self.some_id = some_id
+            
+    In order of all this to work, at least several methods must be implemented: Profile.get, Profile.insert 
+        and Profile.update. See the documentation for the methods to understand their usage. After implementing such 
+        methods, set_data and get_data may be used for actual profile actions.
+        
+    Other than that, various 'functions' are supported during update. A 'function' is a special JSON object that passed
+        instead of actual value to the certain field. Once such object is detected, a 'function' will be applied to it.
+    
+    {
+        "@func": <a function name>,
+        "@cond": <optional condition parameter>
+        "@value": <a value that will be applied to the function>
+    }
+        
+    For example, say we have this object:
+    
+    { "b": 3 }
+    
+    and we apply such update to it:
+    
+    { "b": {
+        "@func": "++",
+        "@value": 7
+    }}
+    
+    The function will be detected, and the original value (3) will be @func'd (incremented) by @value (7):
+    
+    { "b": 10 }
+    
+    This makes a lot of sense in concurrent environment (for example, if two clients are applying increment at the 
+        same time to the same field, the resulting value would be a sum of those increments).
+    
+    Functions can be even nested. For example, if we apply a such update to previous object:
+    
+    {
+        "b": {
+            "@func": "<",
+            "@cond": 50
+            "@value": {
+                "@func": "++",
+                "@value": 1
+            },
+        }
+    }
+    
+    Then the field 'b' will be incremented by 1 (with concurrency support) but only if 'b' is smaller than 50, thus
+        guaranteeing the total amount cannot be greater than 50 concurrently.
+    
+    See FUNCTIONS dict for complete list of supported functions.
+        
+    """
+
     __metaclass__ = ABCMeta
 
     @staticmethod
@@ -183,6 +297,52 @@ class Profile(object):
     @abstractmethod
     @coroutine
     def get(self):
+        """
+        Called when certain Profile object is requested. This method should return (well, raise Return()) 
+            a complete JSON object that represents the Profile.  If the requested object is not found, 
+            NoDataError should be raised.
+        
+        :returns a complete JSON object that represents the Profile
+        :raises NoDataError if no Profile could be found
+        """
+
+        pass
+
+    @abstractmethod
+    @coroutine
+    def insert(self, data):
+        """
+        Called when certain Profile object is being created. 
+        
+        :param data A JSON object that should be associated to the Profile object
+        :raises ProfileError if the creation is not supported
+        """
+
+        pass
+
+    @abstractmethod
+    @coroutine
+    def update(self, data):
+        """
+        Called when certain Profile object is being changed (updated).
+        :param data: A JSON object that should be used to update the Profile object 
+        """
+
+        pass
+
+    @coroutine
+    def init(self):
+        """
+        Called upon initialization of the Profile instance.
+        """
+
+        pass
+
+    @coroutine
+    def release(self):
+        """
+        Called once the Profile instance should be released.
+        """
         pass
 
     @coroutine
@@ -203,19 +363,6 @@ class Profile(object):
             raise Return(result)
         else:
             raise Return(data)
-
-    @coroutine
-    def init(self):
-        pass
-
-    @abstractmethod
-    @coroutine
-    def insert(self, data):
-        pass
-
-    @coroutine
-    def release(self):
-        pass
 
     @coroutine
     def set_data(self, fields, path, merge=True):
@@ -240,13 +387,55 @@ class Profile(object):
         else:
             raise Return(updated)
 
-    @abstractmethod
-    @coroutine
-    def update(self, data):
-        pass
+    @staticmethod
+    def merge_data(old_root, new_data, path, merge=True):
+        return Profile.__merge_profiles__(old_root, new_data, path=path, merge=merge)
 
 
 class DatabaseProfile(Profile):
+
+    """
+    A yet abstract implementation of Profile object that uses Database as storage that allows concurrent requests
+        to be made.
+    
+    Typical usage:
+    
+        @coroutine
+        def get(self):
+            profile = yield self.conn.get(
+                '''
+                    SELECT `profile_object`
+                    FROM `table`
+                    WHERE ...
+                    FOR UPDATE;
+                ''', ...)
+    
+            if profile:
+                raise Return(profile["payload"])
+    
+            raise common.profile.NoDataError()
+    
+        @coroutine
+        def insert(self, data):
+        
+            yield self.conn.insert(
+                '''
+                    INSERT INTO `table`
+                    (..., `profile_object`)
+                    VALUES (..., %s);
+                ''', ..., data)
+    
+        @coroutine
+        def update(self, data):
+            yield self.conn.execute(
+                '''
+                    UPDATE `table`
+                    SET `profile_object`=%s
+                    WHERE ...;
+                ''', ujson.dumps(data), ...)
+    
+    """
+
     __metaclass__ = ABCMeta
 
     def __init__(self, db):

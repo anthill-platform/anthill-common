@@ -14,6 +14,7 @@ class ValidationError(Exception):
 
 
 _str_name_pattern = re.compile("^([A-Za-z0-9_.-]+)+$")
+_str_tags_pattern = re.compile("^([A-Za-z0-9_.,-]+)+$")
 
 
 def validate(**fields):
@@ -38,25 +39,33 @@ def validate(**fields):
             # this generator will return tuples (name, value) of **kwargs with their default values, if omitted
             def _list_kwargs():
                 for argument_name in _args:
+                    _default = False
+
                     try:
                         argument_value = kwargs[argument_name]
                     except KeyError:
                         if argument_name in _defaults:
                             argument_value = _defaults.pop(argument_name)
+                            _default = True
                         else:
                             raise ValidationError("Argument {0} is not set".format(argument_name))
 
-                    yield (argument_name, argument_value)
+                    yield (argument_name, argument_value, _default)
 
                 # give the rest kwargs not mentioned in validation
                 for argument_name, argument_value in kwargs.iteritems():
-                    yield (argument_name, argument_value)
+                    yield (argument_name, argument_value, False)
 
             def validate_arg(t):
                 field_name, field = t
                 validator_name = fields.get(field_name)
                 if not validator_name:
                     return field
+                if inspect.isclass(validator_name):
+                    if isinstance(field, validator_name):
+                        return field
+                    else:
+                        raise ValidationError("{0} is not a '{1}'".format(field_name, validator_name.__name__))
                 validator = VALIDATORS.get(validator_name)
                 if not validator:
                     raise ValidationError("No such validator {0}".format(validator_name))
@@ -66,6 +75,11 @@ def validate(**fields):
                 validator_name = fields.get(field_name)
                 if not validator_name:
                     return value
+                if inspect.isclass(validator_name):
+                    if isinstance(value, validator_name):
+                        return value
+                    else:
+                        raise ValidationError("{0} is not a '{1}'".format(field_name, validator_name.__name__))
                 validator = VALIDATORS.get(validator_name)
                 if not validator:
                     raise ValidationError("No such validator {0}".format(validator_name))
@@ -73,14 +87,28 @@ def validate(**fields):
 
             result_args = map(validate_arg, _list_args())
             result_kwargs = {
-                field_name: validate_kwarg(field_name, field)
-                for field_name, field in _list_kwargs()
+                field_name: field if _default else validate_kwarg(field_name, field)
+                for field_name, field, _default in _list_kwargs()
             }
 
             return method(*result_args, **result_kwargs)
 
         return wrapper2
     return wrapper1
+
+
+def validate_value(value, validator_name):
+    if not validator_name:
+        return value
+    if inspect.isclass(validator_name):
+        if isinstance(value, validator_name):
+            return value
+        else:
+            raise ValidationError("Value is not a '{0}'".format(validator_name.__name__))
+    validator = VALIDATORS.get(validator_name)
+    if not validator:
+        raise ValidationError("No such validator {0}".format(validator_name))
+    return validator('value', value)
 
 
 def _json(field_name, field):
@@ -186,6 +214,21 @@ def _json_list_of_strings(field_name, field):
     ]
 
 
+def _json_list_of_str_name(field_name, field):
+    try:
+        ujson.dumps(field)
+    except (TypeError, ValueError):
+        raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
+
+    if not isinstance(field, list):
+        raise ValidationError("Field {0} is not a valid JSON list".format(field_name))
+
+    return [
+        _str_name(field_name, child)
+        for child in field
+    ]
+
+
 def _json_list_of_ints(field_name, field):
     try:
         ujson.dumps(field)
@@ -258,6 +301,17 @@ def _str_name(field_name, field):
     return field
 
 
+def _str_tags(field_name, field):
+    if not isinstance(field, (str, unicode)):
+        raise ValidationError("Field {0} is not a valid string".format(field_name))
+
+    if not _str_tags_pattern.match(field):
+        raise ValidationError("Field {0} is not a valid name. "
+                              "Only A-Z, a-z, 0-9, '_' and '-' is allowed.".format(field_name))
+
+    return field
+
+
 def _str_datetime(field_name, field):
     try:
         datetime.strptime(field, '%Y-%m-%d %H:%M:%S')
@@ -286,6 +340,7 @@ VALIDATORS = {
     "json_list": _json_list,
     "json_dict_of_ints": _json_dict_of_ints,
     "json_list_of_strings": _json_list_of_strings,
+    "json_list_of_str_name": _json_list_of_str_name,
     "json_list_of_ints": _json_list_of_ints,
     "int": _int,
     "int_or_none": _int_or_none,
@@ -293,6 +348,7 @@ VALIDATORS = {
     "str_or_none": _str_or_none,
     "string": _str,
     "str_name": _str_name,
+    "str_tags": _str_tags,
     "str_datetime": _str_datetime,
     "load_datetime": _load_datetime,
     "datetime": _datetime,
