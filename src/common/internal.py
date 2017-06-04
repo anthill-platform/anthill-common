@@ -171,25 +171,10 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         
         """
 
-        try:
-            service_broker = yield discover.cache.get_service(service, network="broker", version=False)
-        except discover.DiscoveryError as e:
-            raise InternalError(e.code, e.message)
-
-        max_connections = options.internal_max_connections
-
-        connection = yield self.__get_connection__(
-            service_broker,
-            max_connections=max_connections,
-            connection_name="request.{0}".format(service),
-            channel_prefetch_count=options.internal_channel_prefetch_count)
-
-        context = yield connection.__declare_queue__(service)
-
         timer = ElapsedTime("request -> {0}@{1}".format(method, service))
 
         try:
-            result = yield super(Internal, self).request(context, method, timeout, *args, **kwargs)
+            result = yield super(Internal, self).request(service, method, timeout, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:
             raise InternalError(e.code, e.message, e.data)
         except jsonrpc.JsonRPCTimeout:
@@ -211,22 +196,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         """
 
         try:
-            service_broker = yield discover.cache.get_service(service, network="broker", version=False)
-        except discover.DiscoveryError as e:
-            raise InternalError(e.code, e.message)
-
-        max_connections = options.internal_max_connections
-
-        connection = yield self.__get_connection__(
-            service_broker,
-            max_connections=max_connections,
-            connection_name="request.{0}".format(service),
-            channel_prefetch_count=options.internal_channel_prefetch_count)
-
-        context = yield connection.__declare_queue__(service)
-
-        try:
-            yield super(Internal, self).rpc(context, method, *args, **kwargs)
+            yield super(Internal, self).rpc(service, method, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:
             raise InternalError(e.code, e.message, e.data)
         except jsonrpc.JsonRPCTimeout:

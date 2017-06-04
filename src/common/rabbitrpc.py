@@ -8,11 +8,14 @@ from tornado.gen import coroutine, Return, Future, with_timeout, TimeoutError
 
 import jsonrpc
 import rabbitconn
+import discover
 
 import tornado.ioloop
 import logging
 import ujson
 import datetime
+
+from common.options import options
 
 """
 Asynchronous JSON-RPC protocol implementation for RabbitMQ. See http://www.jsonrpc.org/specification
@@ -24,12 +27,11 @@ class Context(object):
         self.channel = channel
         self.routing_key = routing_key or (lambda: None)
         self.reply_to = reply_to or (lambda: None)
-        self.return_future = None
 
 
 class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
     @coroutine
-    def __declare_queue__(self, name):
+    def __declare_queue__(self, name, on_return_callback):
         context = self.named_channels.get(name)
         if context:
             if context.channel.is_open:
@@ -40,20 +42,8 @@ class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
 
         context = Context(channel=None, routing_key=None, reply_to=None)
 
-        def on_return_callback(ch, method, properties, body):
-            if context.return_future:
-                if method.reply_code:
-                    context.return_future.set_exception(jsonrpc.JsonRPCError(method.reply_code, method.reply_text))
-                context.return_future = None
-
-        def confirm_delivery(method):
-            if context.return_future:
-                context.return_future.set_result(True)
-                context.return_future = None
-
         try:
-            channel = yield self.acquire_channel(on_return_callback=on_return_callback,
-                                                 confirm_delivery=confirm_delivery)
+            channel = yield self.acquire_channel(on_return_callback=on_return_callback)
         except Exception as e:
             raise jsonrpc.JsonRPCError(500, "Failed to acquire a channel: " + e.message)
 
@@ -230,3 +220,45 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
                 mandatory=True)
         except ChannelClosed:
             raise jsonrpc.JsonRPCError(503, "Channel is closed")
+
+    def __on_return__(self, ch, method, properties, body):
+        message_id = properties.correlation_id
+
+        if not message_id:
+            return
+
+        future = self.handlers.get(int(message_id), None)
+        if future is None:
+            return
+
+        if method.reply_code:
+            future.set_exception(jsonrpc.JsonRPCError(method.reply_code, method.reply_text))
+
+    @coroutine
+    def __get_context__(self, service):
+        try:
+            service_broker = yield discover.cache.get_service(service, network="broker", version=False)
+        except discover.DiscoveryError as e:
+            raise jsonrpc.JsonRPCError(e.code, e.message)
+
+        max_connections = options.internal_max_connections
+
+        connection = yield self.__get_connection__(
+            service_broker,
+            max_connections=max_connections,
+            connection_name="request.{0}".format(service),
+            channel_prefetch_count=options.internal_channel_prefetch_count)
+
+        context = yield connection.__declare_queue__(service, on_return_callback=self.__on_return__)
+        raise Return(context)
+
+    @coroutine
+    def request(self, service, method, timeout=jsonrpc.JSONRPC_TIMEOUT, *args, **kwargs):
+        context = yield self.__get_context__(service)
+        result = yield super(RabbitMQJsonRPC, self).request(context, method, timeout, *args, **kwargs)
+        raise Return(result)
+
+    @coroutine
+    def rpc(self, service, method, timeout=jsonrpc.JSONRPC_TIMEOUT, *args, **kwargs):
+        context = yield self.__get_context__(service)
+        yield super(RabbitMQJsonRPC, self).rpc(context, method, timeout, *args, **kwargs)

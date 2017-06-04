@@ -88,9 +88,8 @@ class RateLimit(object):
         """
         Tries to proceed action <action> for key <key> (may be account, ip address, group, anything)
 
-        If account exceeded maximum limit of actions, returns False
-
-        Otherwise, returns true
+        :returns RateLimitLock That allows to rollback the usage (in case the <action> failed)
+        :raises RateLimitExceeded If account exceeded maximum limit of actions
         """
 
         limit = self.actions.get(action)
