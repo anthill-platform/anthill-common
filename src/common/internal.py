@@ -199,8 +199,6 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
             yield super(Internal, self).rpc(service, method, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:
             raise InternalError(e.code, e.message, e.data)
-        except jsonrpc.JsonRPCTimeout:
-            raise InternalError(599, "Timed out for rpc {0}@{1}".format(method, service))
 
 
 class InternalError(Exception):

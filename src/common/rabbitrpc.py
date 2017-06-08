@@ -259,6 +259,6 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         raise Return(result)
 
     @coroutine
-    def rpc(self, service, method, timeout=jsonrpc.JSONRPC_TIMEOUT, *args, **kwargs):
+    def rpc(self, service, method, *args, **kwargs):
         context = yield self.__get_context__(service)
-        yield super(RabbitMQJsonRPC, self).rpc(context, method, timeout, *args, **kwargs)
+        yield super(RabbitMQJsonRPC, self).rpc(context, method, *args, **kwargs)

@@ -39,16 +39,18 @@ def validate(**fields):
             # this generator will return tuples (name, value) of **kwargs with their default values, if omitted
             def _list_kwargs():
                 for argument_name in _args:
-                    _default = False
-
                     try:
-                        argument_value = kwargs[argument_name]
+                        argument_value = kwargs.pop(argument_name)
                     except KeyError:
-                        if argument_name in _defaults:
+                        try:
                             argument_value = _defaults.pop(argument_name)
-                            _default = True
+                        except KeyError:
+                            raise ValidationError("Argument {0} is not set and no "
+                                                  "default value is provided".format(argument_name))
                         else:
-                            raise ValidationError("Argument {0} is not set".format(argument_name))
+                            _default = True
+                    else:
+                        _default = argument_value == _defaults.pop(argument_name, None)
 
                     yield (argument_name, argument_value, _default)
 
@@ -165,13 +167,6 @@ def _json_dict(field_name, field):
     return field
 
 
-def _json_dict_or_none(field_name, field):
-    if field is None:
-        return None
-
-    return _json_dict(field_name, field)
-
-
 def _json_list(field_name, field):
     if not isinstance(field, list):
         raise ValidationError("Field {0} is not a valid JSON list".format(field_name))
@@ -265,26 +260,7 @@ def _bool(field_name, field):
         raise ValidationError("Field {0} is not a valid bool".format(field_name))
 
 
-def _int_or_none(field_name, field):
-    if field is None:
-        return None
-
-    try:
-        return int(field)
-    except (TypeError, ValueError):
-        raise ValidationError("Field {0} is not a valid number".format(field_name))
-
-
 def _str(field_name, field):
-    if not isinstance(field, (str, unicode)):
-        raise ValidationError("Field {0} is not a valid string".format(field_name))
-    return field
-
-
-def _str_or_none(field_name, field):
-    if field is None:
-        return None
-
     if not isinstance(field, (str, unicode)):
         raise ValidationError("Field {0} is not a valid string".format(field_name))
     return field
@@ -336,16 +312,13 @@ def _datetime(field_name, field):
 VALIDATORS = {
     "json": _json,
     "json_dict": _json_dict,
-    "json_dict_or_none": _json_dict_or_none,
     "json_list": _json_list,
     "json_dict_of_ints": _json_dict_of_ints,
     "json_list_of_strings": _json_list_of_strings,
     "json_list_of_str_name": _json_list_of_str_name,
     "json_list_of_ints": _json_list_of_ints,
     "int": _int,
-    "int_or_none": _int_or_none,
     "str": _str,
-    "str_or_none": _str_or_none,
     "string": _str,
     "str_name": _str_name,
     "str_tags": _str_tags,
