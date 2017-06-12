@@ -146,7 +146,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         self.callback_consumer = None
 
     @coroutine
-    def listen(self, broker, internal_name, on_receive, timeout=10):
+    def listen(self, broker, internal_name, on_receive, timeout=300):
         self.listen_connection = JsonAMQPConnection(
             self,
             broker,
