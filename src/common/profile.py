@@ -219,6 +219,8 @@ class Profile(object):
     
     Then the field 'b' will be incremented by 1 (with concurrency support) but only if 'b' is smaller than 50, thus
         guaranteeing the total amount cannot be greater than 50 concurrently.
+
+    Also, the whole profile pattern may be used simply by using static method Profile.merge_data
     
     See FUNCTIONS dict for complete list of supported functions.
         
@@ -268,10 +270,15 @@ class Profile(object):
 
         if merge:
             # in case both items are objects, merge them
-            if isinstance(value, dict) and isinstance(object_value, dict):
-
-                for item_key, item_value in value.iteritems():
-                    Profile.__set_profile_field__(object_value, item_key, item_value, merge=merge)
+            if isinstance(value, dict):
+                if object_value is None:
+                    object_value = {}
+                    item[field] = object_value
+                    for item_key, item_value in value.iteritems():
+                        Profile.__set_profile_field__(object_value, item_key, item_value, merge=merge)
+                elif isinstance(object_value, dict):
+                    for item_key, item_value in value.iteritems():
+                        Profile.__set_profile_field__(object_value, item_key, item_value, merge=merge)
                 return
 
         # if a field's value is None, delete such field

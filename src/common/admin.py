@@ -509,7 +509,14 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
     @coroutine
     def opened(self, *args, **kwargs):
         if self.action:
-            yield self.action.opened(**self.action.context)
+            try:
+                yield self.action.opened(**self.action.context)
+            except ActionError as e:
+                self.close(400, e.title)
+            except StreamCommandError as e:
+                self.close(e.code, e.message)
+            except ValidationError as e:
+                self.close(400, e.message)
 
     @coroutine
     def prepared(self, *args, **kwargs):
