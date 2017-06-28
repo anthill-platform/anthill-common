@@ -399,7 +399,12 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
     @coroutine
     def write_data(self, context, data):
         try:
-            yield self.write_message(data)
+            f = self.write_message(data)
+
+            if not f:
+                return
+
+            yield f
         except WebSocketClosedError:
             raise jsonrpc.JsonRPCError(599, "WebSockets closed")
 

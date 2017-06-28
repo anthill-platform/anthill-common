@@ -234,6 +234,7 @@ class Server(tornado.web.Application):
         logging.info("Service '%s' started.", self.name)
 
     def run(self):
+        signal.signal(signal.SIGPIPE, Server.__sigpipe_handler__)
         signal.signal(signal.SIGTERM, self.__sig_handler__)
         signal.signal(signal.SIGINT, self.__sig_handler__)
 
@@ -311,6 +312,10 @@ class Server(tornado.web.Application):
 
         logging.warning('Caught signal: %s', sig)
         tornado.ioloop.IOLoop.instance().add_callback(self.shutdown)
+
+    @staticmethod
+    def __sigpipe_handler__(sig, frame):
+        logging.warning('Caught SIGPIPE')
 
     def shutdown(self):
         self.shutting_down = True
