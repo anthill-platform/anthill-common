@@ -27,8 +27,17 @@ class ServerTestCase(AsyncTestCase):
         pass
 
     @classmethod
+    @coroutine
+    def co_tear_down_class(cls):
+        pass
+
+    @classmethod
     def setUpClass(cls):
         IOLoop.current().run_sync(cls.co_setup_class)
+
+    @classmethod
+    def tearDownClass(cls):
+        IOLoop.current().run_sync(cls.co_tear_down_class)
 
     @classmethod
     @coroutine

@@ -316,7 +316,8 @@ class Server(tornado.web.Application):
         self.shutting_down = True
 
         logging.info('Stopping server!')
-        self.http_server.stop()
+        if self.http_server:
+            self.http_server.stop()
 
         if self.graceful_shutdown:
 
