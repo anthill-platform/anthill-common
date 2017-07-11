@@ -30,7 +30,20 @@ class Functions(object):
             if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
                 raise FuncError("Not a number")
         new_value = (object_value or 0) - value
-        if new_value <= 0:
+        return new_value
+
+    @staticmethod
+    def func_decrement_zero(object_value, condition, value):
+        """
+        Function that decrements Profile's value by '@value' field. For example, this object:
+
+        { "a": 10 } after applying the function { "@func": "--", "@value": 5 } to it will be updated to be: { "a": 5 }
+        """
+        if object_value is not None:
+            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
+                raise FuncError("Not a number")
+        new_value = (object_value or 0) - value
+        if new_value < 0:
             raise FuncError("not_enough")
         return new_value
 
@@ -140,10 +153,12 @@ class Functions(object):
     FUNCTIONS = {
         "++": func_increment,
         "--": func_decrement,
+        "--/0": func_decrement_zero,
         "!=": func_not_equal,
         "==": func_equal,
         "increment": func_increment,
         "decrement": func_decrement,
+        "decrement_greater_zero": func_decrement_zero,
         "exists": func_exists,
         ">=": func_greater_equal_than,
         "<=": func_smaller_equal_than,

@@ -11,7 +11,7 @@ import signal
 from inspect import isfunction
 
 
-def cached(kv, h, ttl=300, lock=False, json=False):
+def cached(kv, h, ttl=300, lock=False, json=False, check_is_cached=False):
     """
         Coroutine-friendly decorator to cache a call result into a key/value storage.
         :param kv: a key-value storage
@@ -21,6 +21,8 @@ def cached(kv, h, ttl=300, lock=False, json=False):
         :param lock: whenever a request should be locked for `cache_hash` to deal with concurrent requests
         :param json: whenever the data being cached is a json object
                      if it is, it will be packed properly
+        :param check_is_cached: result will be returned as tuple (result, is_cached), where is_cached is bool, meaning
+                                whenever result was a fresh one or pulled from a cache
 
         Decorated method should have such arguments passed:
             cache_hash:
@@ -66,6 +68,7 @@ def cached(kv, h, ttl=300, lock=False, json=False):
                 if cache:
                     if json:
                         cache = ujson.loads(cache)
+                    _is_cached = True
                 else:
                     logging.debug("Noting found, resolving the value")
 
@@ -78,12 +81,17 @@ def cached(kv, h, ttl=300, lock=False, json=False):
 
                     logging.debug("Storing key '%s' in the cache", _hash)
                     yield Task(db.setex, _hash, ttl, to_store)
+                    _is_cached = False
 
                 if lock_obj:
                     yield Task(lock_obj.release)
 
             finally:
                 yield db.release()
+
+            if check_is_cached:
+                result = (cache, _is_cached)
+                raise Return(result)
 
             raise Return(cache)
 
@@ -228,8 +236,11 @@ class Flags(object):
     def __str__(self):
         return ",".join(self._flags)
 
-    def set(self, flag):
-        self._flags.add(flag)
+    def set(self, flag, value=True):
+        if value:
+            self._flags.add(flag)
+        else:
+            self._flags.remove(flag)
 
     def clear(self, flag):
         self._flags.remove(flag)

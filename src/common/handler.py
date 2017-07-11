@@ -154,6 +154,13 @@ class AuthenticatedHandlerMixin(object):
     def logout(self):
         self.clear_cookie("access_token")
 
+    def has_scopes(self, scopes):
+        """
+        Check if the user has access to the specified scopes
+        """
+        current_user = self.current_user
+        return (current_user is not None) and (current_user.token.has_scopes(scopes))
+
     def __token_needs_refresh__(self, token, db):
         internal_ = internal.Internal()
 

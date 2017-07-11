@@ -246,6 +246,13 @@ def _int(field_name, field):
         raise ValidationError("Field {0} is not a valid number".format(field_name))
 
 
+def _float(field_name, field):
+    try:
+        return float(field)
+    except (TypeError, ValueError):
+        raise ValidationError("Field {0} is not a valid floating number".format(field_name))
+
+
 def _bool(field_name, field):
 
     if isinstance(field, bool):
@@ -296,14 +303,10 @@ def _str_datetime(field_name, field):
     return field
 
 
-def _load_datetime(field_name, field):
-    try:
-        return datetime.strptime(field, '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        raise ValidationError("Field {0} is not a valid date".format(field_name))
-
-
 def _datetime(field_name, field):
+    if isinstance(field, (str, unicode)):
+        return datetime.strptime(field, '%Y-%m-%d %H:%M:%S')
+
     if not isinstance(field, datetime):
         raise ValidationError("Field {0} is not a valid date".format(field_name))
     return field
@@ -318,12 +321,12 @@ VALIDATORS = {
     "json_list_of_str_name": _json_list_of_str_name,
     "json_list_of_ints": _json_list_of_ints,
     "int": _int,
+    "float": _float,
     "str": _str,
     "string": _str,
     "str_name": _str_name,
     "str_tags": _str_tags,
     "str_datetime": _str_datetime,
-    "load_datetime": _load_datetime,
     "datetime": _datetime,
     "bool": _bool,
     "load_json": _load_json,
