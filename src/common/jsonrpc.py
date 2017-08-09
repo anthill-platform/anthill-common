@@ -195,7 +195,7 @@ class JsonRPC(object):
         pass
 
     @coroutine
-    def request(self, context, method, timeout=JSONRPC_TIMEOUT, *args, **kwargs):
+    def send_request(self, context, method, timeout=JSONRPC_TIMEOUT, *args, **kwargs):
         msg_id = self.__get_next_id__()
         data, params = self.__generate_request__(method, *args, **kwargs)
 
@@ -224,7 +224,7 @@ class JsonRPC(object):
         }, **payload)
 
     @coroutine
-    def rpc(self, context, method, *args, **kwargs):
+    def send_rpc(self, context, method, *args, **kwargs):
         to_write = {
             "jsonrpc": "2.0",
             "method": method

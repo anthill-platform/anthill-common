@@ -319,7 +319,7 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornad
             self.ping("")
 
     def open(self, *args, **kwargs):
-        tornado.ioloop.IOLoop.current().add_callback(self.opened, *args, **kwargs)
+        tornado.ioloop.IOLoop.current().add_callback(self.__process_opened__, *args, **kwargs)
         if self.enable_ping():
             self._pingcb = tornado.ioloop.PeriodicCallback(self.__do_ping__, 10000)
             self._pingcb.start()
@@ -332,6 +332,17 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornad
     @coroutine
     def closed(self):
         pass
+
+    @coroutine
+    def __process_opened__(self, *args, **kwargs):
+        try:
+            yield self.opened(*args, **kwargs)
+        except ValidationError as e:
+            self.close(400, e.message)
+        except HTTPError as e:
+            self.close(e.status_code, e.reason)
+        except BaseException as e:
+            self.close(500, str(e))
 
     @coroutine
     def opened(self, *args, **kwargs):
@@ -383,13 +394,15 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
             try:
                 response = yield getattr(self, action)(*args, **kwargs)
             except TypeError as e:
+                logging.exception("JsonRPCWSHandler TypeError")
                 raise jsonrpc.JsonRPCError(400, "Bad arguments: " + e.args[0])
             except jsonrpc.JsonRPCError as e:
                 raise e
             except ValidationError as e:
                 raise jsonrpc.JsonRPCError(400, e.message)
             except Exception as e:
-                raise jsonrpc.JsonRPCError(500, "Error: " + str(e))
+                logging.exception("JsonRPCWSHandler exception")
+                raise jsonrpc.JsonRPCError(500, str(e.__class__.__name__) + ": " + str(e))
 
             raise Return(response)
         else:

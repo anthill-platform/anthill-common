@@ -174,7 +174,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         timer = ElapsedTime("request -> {0}@{1}".format(method, service))
 
         try:
-            result = yield super(Internal, self).request(service, method, timeout, *args, **kwargs)
+            result = yield self.send_request(service, method, timeout, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:
             raise InternalError(e.code, e.message, e.data)
         except jsonrpc.JsonRPCTimeout:
@@ -196,7 +196,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         """
 
         try:
-            yield super(Internal, self).rpc(service, method, *args, **kwargs)
+            yield self.send_rpc(service, method, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:
             raise InternalError(e.code, e.message, e.data)
 

@@ -11,144 +11,554 @@ class FuncError(Exception):
 class Functions(object):
 
     @staticmethod
-    def apply_func(func, object_value, condition, value):
-        try:
-            f = Functions.FUNCTIONS[func]
-        except KeyError:
-            raise FuncError("no_such_func")
-        else:
-            return f.__func__(object_value, condition, value)
+    def check_value(field_name, object_value, value):
+        if isinstance(value, dict):
+            func_name = value.get("@func", None)
+            if func_name:
+                return Functions.apply_func(str(func_name), field_name, object_value, value)
+        return True, value
 
     @staticmethod
-    def func_decrement(object_value, condition, value):
+    def apply_func(func_name, field_name, object_value, arguments):
+        try:
+            f = Functions.FUNCTIONS[func_name]
+        except KeyError:
+            raise ProfileError("No such function: " + str(func_name))
+        else:
+            try:
+                do_apply, new_value = f.__func__(field_name, object_value, arguments)
+            except FuncError as e:
+                raise ProfileError("Failed to update field '{0}': {1}".format(field_name, e.message))
+            else:
+                return do_apply, new_value
+
+    @staticmethod
+    def func_decrement(field_name, object_value, arguments, **ignored):
         """
-        Function that decrements Profile's value by '@value' field. For example, this object:
-        
+        Function that decrements Profile's value by '@value' field.
+
+        Arguments:
+            @value: how much to decrement
+
+        For example, this object:
+
         { "a": 10 } after applying the function { "@func": "--", "@value": 5 } to it will be updated to be: { "a": 5 }
         """
+
+        value = arguments.get("@value", None)
+        if not value:
+            raise FuncError("@value is not defined")
+        if not isinstance(value, (int, float)):
+            raise FuncError("@value is not a number")
+
         if object_value is not None:
             if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
                 raise FuncError("Not a number")
         new_value = (object_value or 0) - value
-        return new_value
+
+        return True, new_value
 
     @staticmethod
-    def func_decrement_zero(object_value, condition, value):
+    def func_decrement_zero(field_name, object_value, arguments, **ignored):
         """
-        Function that decrements Profile's value by '@value' field. For example, this object:
+        Function that decrements Profile's value by '@value' field, only if new value is >= 0.
+
+        Arguments:
+            @value: how much to decrement
+
+        For example, this object:
 
         { "a": 10 } after applying the function { "@func": "--", "@value": 5 } to it will be updated to be: { "a": 5 }
         """
+
+        value = arguments.get("@value", None)
+        if not value:
+            raise FuncError("@value is not defined")
+        if not isinstance(value, (int, float)):
+            raise FuncError("@value is not a number")
+
         if object_value is not None:
             if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
                 raise FuncError("Not a number")
         new_value = (object_value or 0) - value
         if new_value < 0:
             raise FuncError("not_enough")
-        return new_value
+
+        return True, new_value
 
     @staticmethod
-    def func_equal(object_value, condition, value):
+    def func_equal(field_name, object_value, arguments, **ignored):
         """
-        Function that ensures the field is equal to '@value' field. if not, update will fail with error:
+        Function that ensures the field is equal to '@value' field.
+
+        Arguments:
+            @cond: An object to compare the value to
+            @value: (Optional) a value to use instead of object's value (see below), useful for nesting
+            @then: (Optional) a value to use, if the condition is equal to object's value. If condition is equal,
+                and @then is not defined, nothing happens (object's value remains the same)
+            @else: (Optional) a value to use, if the condition is not equal to object's value. If the condition is not
+                equal, and @else is not defined, FuncError 'not_equal' is raised.
+
+        if not, update will fail with error:
         
-        { "a": 10 } after applying the function { "@func": "==", "@value": 9 } to it will fail with FuncError, but
-            after applying the function { "@func": "==", "@value": 10 } nothing will happen.
+        { "a": 10 } after applying the function { "@func": "==", "@cond": 9 } to it will fail with FuncError, but
+            after applying the function { "@func": "==", "@cond": 10 } nothing will happen.
             
         This function along with other is useful to make certain operation only if certain requirement is met.
         """
-        if object_value != condition:
+
+        condition = arguments.get("@cond", None)
+        if not condition:
+            raise FuncError("@cond is not defined")
+
+        value = arguments.get("@value", None)
+        if value:
+            ignored, value = Functions.check_value(field_name, object_value, value)
+        else:
+            value = object_value
+
+        if value != condition:
+            else_ = arguments.get("@else", None)
+            if else_:
+                return Functions.check_value(field_name, value, else_)
             raise FuncError("not_equal")
-        return value
+
+        then_ = arguments.get("@then", None)
+        if then_:
+            return Functions.check_value(field_name, value, then_)
+
+        return False, None
 
     @staticmethod
-    def func_exists(object_value, condition, value):
+    def func_exists(field_name, object_value, arguments, **ignored):
         """
-        Function that ensures the field exists. if not, update will fail with error:
+        Function that ensures the field exists.
+
+        Arguments:
+            @then: (Optional) a value to use, if the object exists. If object exists,
+                and @then is not defined, nothing happens (object remains present)
+            @else: (Optional) a value to use, if the object does not exist. If object does not exist,
+                and @else is not defined, FuncError 'not_exists' is raised.
+
+        Example value:
+        {"a": 10}
         
-        { "a": 10 }
-        
-        This update:
-        
-        { 
-            "b": { "@func": "exists" }
-        }
-        
-        will fail with FuncError, but this one:
-        
-        { 
-            "a": { "@func": "exists" }
-        }
-        
-        wont.
-            
-        This function along with other is useful to make certain operation only if certain requirement is met.
+        Example updates
+        {"b": { "@func": "exists" }} -> FuncError 'not_exists'
+        {"a": { "@func": "exists" }} -> Nothing happens
+        {"a": { "@func": "exists", "@then": 5 }} -> {"a": 5}
+        {"b": { "@func": "exists", "@else": 5 }} -> {"a": 10, "b": 5}
+        {"a": { "@func": "exists", "@else": 5 }} -> {"a": 10}
+
         """
         if object_value is None:
+            else_ = arguments.get("@else", None)
+            if else_:
+                return Functions.check_value(field_name, object_value, else_)
             raise FuncError("not_exists")
-        return object_value
+
+        then_ = arguments.get("@then", None)
+        if then_:
+            return Functions.check_value(field_name, object_value, then_)
+
+        return False, None
 
     @staticmethod
-    def func_greater_equal_than(object_value, condition, value):
+    def func_array_append(field_name, object_value, arguments, **ignored):
         """
-        Function that ensures the field is >= to '@value' field. if not, update will fail with error:
+        Function that appends an object into the end of the array (list)
+
+        Arguments:
+            @value: Valid JSON object to add
+            @limit: (Optional) A maximum size of the array. If the limit is reached, 'limit_exceeded' is raised.
+            @shift: (Optional) If true, and limit is reached, the first element will be deleted to free space
+
+        Example value:
+        {"a": ["test1", "test2", "test3"]}
+
+        Example updates
+        {"a": { "@func": "append", "@value": 5 }} -> {"a": ["test1", "test2", "test3", 5]}
+        {"a": { "@func": "append", "@value": 5, "@limit": 3 }} -> FuncError 'limit_exceeded'
+        {"a": { "@func": "append", "@value": 5, "@limit": 3, "@shift": true }} -> {"a": ["test2", "test3", 5]}
+
+        """
+
+        value = arguments.get("@value", None)
+        if not value:
+            raise FuncError("@value is not defined")
+
+        if object_value:
+            if not isinstance(object_value, list):
+                raise FuncError("Object is not a list")
+        else:
+            object_value = []
+
+        object_value.append(value)
+
+        limit = arguments.get("@limit", None)
+        if limit:
+            if not isinstance(limit, (int, float)):
+                raise FuncError("@limit is not a number")
+            if len(object_value) > limit:
+                if arguments.get("@shift", False):
+                    object_value = object_value[-limit:]
+                else:
+                    raise FuncError("limit_exceeded")
+
+        return True, object_value
+
+    @staticmethod
+    def func_not_exists(field_name, object_value, arguments, **ignored):
+        """
+        Function that ensures the field does not exist.
+
+        Arguments:
+            @then: (Optional) a value to use, if the object does not exist. If object does not exist,
+                and @then is not defined, nothing happens (object remains not present)
+            @else: (Optional) a value to use, if the object does exist. If object does exist,
+                and @else is not defined, FuncError 'exists' is raised.
+
+        Example value:
+        {"a": 10}
+
+        Example updates
+        {"b": { "@func": "exists" }} -> FuncError 'not_exists'
+        {"a": { "@func": "exists" }} -> Nothing happens
+        {"a": { "@func": "exists", "@then": 5 }} -> {"a": 5}
+        {"b": { "@func": "exists", "@else": 5 }} -> {"a": 10, "b": 5}
+        {"a": { "@func": "exists", "@else": 5 }} -> {"a": 10}
+
+        """
+        if object_value is not None:
+            else_ = arguments.get("@else", None)
+            if else_:
+                return Functions.check_value(field_name, object_value, else_)
+            raise FuncError("exists")
+
+        then_ = arguments.get("@then", None)
+        if then_:
+            return Functions.check_value(field_name, object_value, then_)
+
+        return False, None
+
+    @staticmethod
+    def func_num_child_where(field_name, object_value, arguments):
+        """
+        Function that return number of child objects (that assumes that the object in question is a dict
+            or a list of dicts) that pass with come criteria.
+
+        Arguments:
+            @test: Conditional function to test child object's fields upon.
+            @field: Field name of child objects to test
+            ... others are passed to Conditional function
+
+        For example, say you have this object:
+        {"members": {"a": {"stats": 20}, "b": {"stats": 10}, "c": {"stats": 5}, "d": {"stats": 200}}}
+
+        And you would to check how much of members do have "stats" more that 15:
+
+        {
+            "members": {"@func": "num_child_where", "@test": ">", "@field": "stats", "@value": 15}
+        }
+
+        This is practically useful if you just need to make sure that there's more that 2 of such:
+
+        {
+            "members": {
+                "@value": {
+                    "@func": "num_child_where",
+                    "@test": ">",
+                    "@field": "stats",
+                    "@value": 15
+                },
+                "@func": ">",
+                "@cond": 2
+            }
+        }
+
+        """
+
+        func_name = arguments.get("@test")
+        field_name = arguments.get("@field")
+        if func_name is None:
+            raise FuncError("@cond is not defined")
+        if field_name is None:
+            raise FuncError("@field is not defined")
+
+        f = Functions.FUNCTIONS.get(func_name)
+        if f is None:
+            raise FuncError("No such function: " + str(func_name))
+
+        def check(child):
+            if isinstance(child, dict):
+                child_value = child.get(field_name, None)
+                try:
+                    # return values are ignored
+                    f.__func__(field_name, child_value, arguments)
+                except FuncError:
+                    return False
+                else:
+                    return True
+            return False
+
+        if isinstance(object_value, dict):
+            return True, sum(1 for item in object_value.itervalues() if check(item))
+        elif isinstance(object_value, list):
+            return True, sum(1 for item in object_value if check(item))
+        else:
+            raise FuncError("Object is neither dict or list")
+
+    @staticmethod
+    def func_greater_equal_than(field_name, object_value, arguments):
+        """
+        Function that ensures the field is >= to '@value' field.
+
+        Arguments:
+            @cond: An object to compare the value to
+            @value: (Optional) a value to use instead of object's value (see below), useful for nesting
+            @then: (Optional) a value to use, if the condition is >= to object's value. If condition is >=,
+                and @then is not defined, nothing happens (object's value remains the same)
+            @else: (Optional) a value to use, if the condition is < to object's value. If the condition is <,
+                and @else is not defined, FuncError 'smaller' is raised.
+
+        if not, update will fail with error:
         
         { "a": 8 } after applying the function { "@func": ">=", "@value": 9 } to it will fail with FuncError, but
             after applying the function { "@func": ">=", "@value": 7 } nothing will happen.
             
         This function along with other is useful to make certain operation only if certain requirement is met.
         """
-        if object_value is not None:
-            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-                raise FuncError("Not a number")
-        if (object_value or 0) < condition:
+
+        condition = arguments.get("@cond", None)
+        if not condition:
+            raise FuncError("@cond is not defined")
+
+        value = arguments.get("@value", None)
+        if value:
+            ignored, value = Functions.check_value(field_name, object_value, value)
+        else:
+            value = object_value
+
+        if (value is not None) and (not isinstance(value, (int, float))):
+            raise FuncError("value is not a number")
+
+        if (value or 0) < condition:
+            else_ = arguments.get("@else", None)
+            if else_:
+                return Functions.check_value(field_name, value, else_)
             raise FuncError("smaller")
-        return value
+
+        then_ = arguments.get("@then", None)
+        if then_:
+            return Functions.check_value(field_name, value, then_)
+
+        return False, None
 
     @staticmethod
-    def func_greater_than(object_value, condition, value):
-        if object_value is not None:
-            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-                raise FuncError("Not a number")
-        if (object_value or 0) <= condition:
-            raise FuncError("smaller_or_equal")
-        return value
-
-    @staticmethod
-    def func_increment(object_value, condition, value):
+    def func_greater_than(field_name, object_value, arguments):
         """
-        Function that increments Profile's value by '@value' field. For example, this object:
+        Function that ensures the field is > to '@value' field.
+
+        Arguments:
+            @cond: An object to compare the value to
+            @value: (Optional) a value to use instead of object's value (see below), useful for nesting
+            @then: (Optional) a value to use, if the condition is > to object's value. If condition is >,
+                and @then is not defined, nothing happens (object's value remains the same)
+            @else: (Optional) a value to use, if the condition is <= to object's value. If the condition is <=,
+                and @else is not defined, FuncError 'smaller_or_equal' is raised.
+
+        if not, update will fail with error:
+
+        { "a": 8 } after applying the function { "@func": ">", "@value": 9 } to it will fail with FuncError, but
+            after applying the function { "@func": ">", "@value": 7 } nothing will happen.
+
+        This function along with other is useful to make certain operation only if certain requirement is met.
+        """
+
+        condition = arguments.get("@cond", None)
+        if not condition:
+            raise FuncError("@cond is not defined")
+
+        value = arguments.get("@value", None)
+        if value:
+            ignored, value = Functions.check_value(field_name, object_value, value)
+        else:
+            value = object_value
+
+        if (value is not None) and (not isinstance(value, (int, float))):
+            raise FuncError("value is not a number")
+
+        if (value or 0) <= condition:
+            else_ = arguments.get("@else", None)
+            if else_:
+                return Functions.check_value(field_name, value, else_)
+            raise FuncError("smaller_or_equal")
+
+        then_ = arguments.get("@then", None)
+        if then_:
+            return Functions.check_value(field_name, value, then_)
+
+        return False, None
+
+    @staticmethod
+    def func_increment(field_name, object_value, arguments):
+        """
+        Function that increments Profile's value by '@value' field.
+
+        Arguments:
+            @value: how much to decrement
+
+        For example, this object:
         
         { "a": 10 } after applying the function { "@func": "++", "@value": 5 } will be updated to be: { "a": 15 }
         """
+
+        value = arguments.get("@value", None)
+        if not value:
+            raise FuncError("@value is not defined")
+        if not isinstance(value, (int, float)):
+            raise FuncError("@value is not a number")
+
         if object_value is not None:
             if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
                 raise FuncError("Not a number")
-        return (object_value or 0) + value
+
+        return True, (object_value or 0) + value
 
     @staticmethod
-    def func_not_equal(object_value, condition, value):
-        if object_value == condition:
+    def func_not_equal(field_name, object_value, arguments):
+        """
+        Function that ensures the field is not equal to '@value' field.
+
+        Arguments:
+            @cond: An object to compare the value to
+            @value: (Optional) a value to use instead of object's value (see below), useful for nesting
+            @then: (Optional) a value to use, if the condition is not equal to object's value. If condition is not
+                equal, and @then is not defined, nothing happens (object's value remains the same)
+            @else: (Optional) a value to use, if the condition is equal to object's value. If the condition is equal,
+                and @else is not defined, FuncError 'equal' is raised.
+
+        if not, update will fail with error:
+
+        { "a": 10 } after applying the function { "@func": "!=", "@cond": 10 } to it will fail with FuncError, but
+            after applying the function { "@func": "!=", "@cond": 9 } nothing will happen.
+
+        This function along with other is useful to make certain operation only if certain requirement is met.
+        """
+
+        condition = arguments.get("@cond", None)
+        if not condition:
+            raise FuncError("@cond is not defined")
+
+        value = arguments.get("@value", None)
+        if value:
+            ignored, value = Functions.check_value(field_name, object_value, value)
+        else:
+            value = object_value
+
+        if value == condition:
+            else_ = arguments.get("@else", None)
+            if else_:
+                return Functions.check_value(field_name, value, else_)
             raise FuncError("equal")
-        return value
+
+        then_ = arguments.get("@then", None)
+        if then_:
+            return Functions.check_value(field_name, value, then_)
+
+        return False, None
 
     @staticmethod
-    def func_smaller_equal_than(object_value, condition, value):
-        if object_value is not None:
-            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-                raise FuncError("Not a number")
-        if (object_value or 0) > condition:
+    def func_smaller_equal_than(field_name, object_value, arguments):
+        """
+        Function that ensures the field is <= to '@value' field.
+
+        Arguments:
+            @cond: An object to compare the value to
+            @value: (Optional) a value to use instead of object's value (see below), useful for nesting
+            @then: (Optional) a value to use, if the condition is <= to object's value. If condition is <=,
+                and @then is not defined, nothing happens (object's value remains the same)
+            @else: (Optional) a value to use, if the condition is > to object's value. If the condition is >,
+                and @else is not defined, FuncError 'greater' is raised.
+
+        if not, update will fail with error:
+
+        { "a": 8 } after applying the function { "@func": "<=", "@value": 7 } to it will fail with FuncError, but
+            after applying the function { "@func": "<=", "@value": 9 } nothing will happen.
+
+        This function along with other is useful to make certain operation only if certain requirement is met.
+        """
+
+        condition = arguments.get("@cond", None)
+        if not condition:
+            raise FuncError("@cond is not defined")
+
+        value = arguments.get("@value", None)
+        if value:
+            ignored, value = Functions.check_value(field_name, object_value, value)
+        else:
+            value = object_value
+
+        if (value is not None) and (not isinstance(value, (int, float))):
+                raise FuncError("value is not a number")
+
+        if (value or 0) > condition:
+            else_ = arguments.get("@else", None)
+            if else_:
+                return Functions.check_value(field_name, value, else_)
             raise FuncError("greater")
-        return value
+
+        then_ = arguments.get("@then", None)
+        if then_:
+            return Functions.check_value(field_name, value, then_)
+
+        return False, None
 
     @staticmethod
-    def func_smaller_than(object_value, condition, value):
-        if object_value is not None:
-            if (not isinstance(object_value, (int, float))) or (not isinstance(value, (int, float))):
-                raise FuncError("Not a number")
-        if (object_value or 0) >= condition:
+    def func_smaller_than(field_name, object_value, arguments):
+        """
+        Function that ensures the field is < to '@value' field.
+
+        Arguments:
+            @cond: An object to compare the value to
+            @value: (Optional) a value to use instead of object's value (see below), useful for nesting
+            @then: (Optional) a value to use, if the condition is < to object's value. If condition is <,
+                and @then is not defined, nothing happens (object's value remains the same)
+            @else: (Optional) a value to use, if the condition is >= to object's value. If the condition is >=,
+                and @else is not defined, FuncError 'greater_or_equal' is raised.
+
+        if not, update will fail with error:
+
+        { "a": 8 } after applying the function { "@func": "<", "@value": 7 } to it will fail with FuncError, but
+            after applying the function { "@func": "<", "@value": 9 } nothing will happen.
+
+        This function along with other is useful to make certain operation only if certain requirement is met.
+        """
+
+        condition = arguments.get("@cond", None)
+        if not condition:
+            raise FuncError("@cond is not defined")
+
+        value = arguments.get("@value", None)
+        if value:
+            ignored, value = Functions.check_value(field_name, object_value, value)
+        else:
+            value = object_value
+
+        if (value is not None) and (not isinstance(value, (int, float))):
+            raise FuncError("value is not a number")
+
+        if (value or 0) >= condition:
+            else_ = arguments.get("@else", None)
+            if else_:
+                return Functions.check_value(field_name, value, else_)
             raise FuncError("greater_or_equal")
-        return value
+
+        then_ = arguments.get("@then", None)
+        if then_:
+            return Functions.check_value(field_name, value, then_)
+
+        return False, None
 
     FUNCTIONS = {
         "++": func_increment,
@@ -160,10 +570,13 @@ class Functions(object):
         "decrement": func_decrement,
         "decrement_greater_zero": func_decrement_zero,
         "exists": func_exists,
+        "not_exists": func_not_exists,
+        "array_append": func_array_append,
         ">=": func_greater_equal_than,
         "<=": func_smaller_equal_than,
         ">": func_greater_than,
-        "<": func_smaller_than
+        "<": func_smaller_than,
+        "num_child_where": func_num_child_where
     }
 
 
@@ -244,22 +657,6 @@ class Profile(object):
     __metaclass__ = ABCMeta
 
     @staticmethod
-    def __check_value__(field, object_value, value):
-        if isinstance(value, dict):
-            if ("@func" in value) and ("@value" in value):
-                func_name = value["@func"]
-                func_condition = value.get("@cond")
-                func_value = Profile.__check_value__(field, object_value, value["@value"])
-                try:
-                    new_value = Functions.apply_func(func_name, object_value, func_condition, func_value)
-                except FuncError as e:
-                    raise ProfileError("Failed to update field '{0}': {1}".format(field, e.message))
-                else:
-                    return new_value
-
-        return value
-
-    @staticmethod
     def __get_field__(item, path):
         try:
             key = path.pop(0)
@@ -281,7 +678,10 @@ class Profile(object):
     def __set_profile_field__(item, field, value, merge=True):
         object_value = item[field] if field in item else None
 
-        value = Profile.__check_value__(field, object_value, value)
+        do_apply, value = Functions.check_value(field, object_value, value)
+
+        if not do_apply:
+            return
 
         if merge:
             # in case both items are objects, merge them
@@ -473,6 +873,27 @@ class DatabaseProfile(Profile):
     def release(self):
         yield self.conn.commit()
         self.conn.close()
+
+
+class PredefinedProfile(Profile):
+    """
+    Profile object with value object already supplied.
+    Updating or inserting is nor supported.
+    """
+    def __init__(self, value):
+        self.value = value
+
+    @coroutine
+    def get(self):
+        raise Return(self.value)
+
+    @coroutine
+    def update(self, data):
+        pass
+
+    @coroutine
+    def insert(self, data):
+        pass
 
 
 class ProfileError(Exception):

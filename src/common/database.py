@@ -45,6 +45,9 @@ class DatabaseConnection(object):
         """
         yield self.conn.commit()
 
+    def rollback(self):
+        return self.conn.rollback()
+
     @coroutine
     def execute(self, query, *args, **kwargs):
         """
