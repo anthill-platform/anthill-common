@@ -214,7 +214,8 @@ class ConditionFunctions(object):
         if not isinstance(value, (str, unicode, int, float, bool)):
             raise ConditionError("Bad value")
 
-        return "CAST(JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) AS CHAR) = %s".format(field), ["$.{0}".format(path), str(value)]
+        return "CAST(JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) AS CHAR) = %s".format(field), \
+               ["$.\"{0}\"".format(path), str(value)]
 
     @staticmethod
     def greater_than(field, path, obj):
