@@ -30,7 +30,6 @@ from . import retry, ElapsedTime
 
 MAX_WAIT_SECONDS_BEFORE_SHUTDOWN = 5
 
-SERVICE_VERSION = "0.1"
 tornado.netutil.Resolver.configure('tornado.netutil.ThreadedResolver')
 
 
@@ -48,7 +47,7 @@ class Server(tornado.web.Application):
 
         self.http_server = None
 
-        self.api_version = SERVICE_VERSION
+        self.api_version = options.api_version
 
         handlers = self.get_handlers() or []
 
@@ -85,6 +84,10 @@ class Server(tornado.web.Application):
         if options.serve_static:
             handlers.append((r'/static/(.*)', tornado.web.StaticFileHandler,
                              {'path': 'static', "default_filename": "index.html"}))
+
+        handlers.append(('/', self.get_root_handler()))
+
+        self.debug_mode = options.debug
 
         super(Server, self).__init__(
             handlers=handlers, debug=options.debug
@@ -138,6 +141,9 @@ class Server(tornado.web.Application):
 
     def get_admin_stream(self):
         return {}
+
+    def get_root_handler(self):
+        return handler.RootHandler
 
     def get_internal_handler(self):
         """

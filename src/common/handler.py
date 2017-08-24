@@ -467,3 +467,16 @@ class LogoutHandler(AuthenticatedHandler):
     def get(self):
         self.logout()
         self.redirect("/")
+
+
+class RootHandler(RequestHandler, JsonHandlerMixin):
+    def get(self):
+        if self.application.debug_mode:
+            self.set_header("X-Service-Name", self.application.name)
+            self.set_header("X-Service-Host", self.application.get_host())
+            if self.application.api_version:
+                self.set_header("X-API-Version", self.application.api_version)
+            self.dumps(self.application.metadata)
+            return
+
+        super(RootHandler, self).get()

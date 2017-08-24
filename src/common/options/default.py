@@ -3,6 +3,11 @@ from . import define
 
 # Internal
 
+define("api_version",
+       default="",
+       help="Service API version",
+       type=str)
+
 define("internal_restrict",
        default=["127.0.0.1/24", "::1/128"],
        help="An addresses considered internal (can be multiple). Requests from those are allowed to do everything, "
@@ -12,7 +17,7 @@ define("internal_restrict",
        type=str)
 
 define("internal_broker",
-       default="amqp://anthill:anthill@127.0.0.1:5672/dev",
+       default="amqp://guest:guest@127.0.0.1:5672/",
        help="RabbitMQ messages broker location (amqp).",
        group="internal",
        type=str)
@@ -58,7 +63,7 @@ define("token_cache_max_connections",
 # Discovery
 
 define("discovery_service",
-       default="http://discovery-dev.anthill.internal",
+       default="http://localhost:9502",
        help="Discovery service location (if applicable).",
        group="discovery",
        type=str)
@@ -66,14 +71,14 @@ define("discovery_service",
 # Pub/sub
 
 define("pubsub",
-       default="amqp://anthill:anthill@127.0.0.1:5672/dev",
+       default="amqp://guest:guest@127.0.0.1:5672/",
        help="Location of rabbitmq server for pub/sub operations.",
        type=str)
 
 # Keys
 
 define("auth_key_public",
-       default="../anthill-keys/anthill.pub",
+       default="../.anthill-keys/anthill.pub",
        help="Location of public key required for access token verification.",
        type=str)
 
@@ -87,11 +92,11 @@ define("serve_static",
 # Other
 
 define("debug",
-       default=False,
-       help="Is debug mode enabled (full stack trace)",
+       default=True,
+       help="Is debug mode enabled (includes full stack trace)",
        type=bool)
 
 define("graceful_shutdown",
-       default=True,
+       default=False,
        help="Whether should service shutdown gracefully or not",
        type=bool)
