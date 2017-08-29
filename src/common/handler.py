@@ -327,26 +327,26 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornad
     def on_close(self):
         if self._pingcb:
             self._pingcb.stop()
-        tornado.ioloop.IOLoop.current().add_callback(self.closed)
+        tornado.ioloop.IOLoop.current().add_callback(self.on_closed)
 
     @coroutine
-    def closed(self):
+    def on_opened(self, *args, **kwargs):
+        pass
+
+    @coroutine
+    def on_closed(self):
         pass
 
     @coroutine
     def __process_opened__(self, *args, **kwargs):
         try:
-            yield self.opened(*args, **kwargs)
+            yield self.on_opened(*args, **kwargs)
         except ValidationError as e:
             self.close(400, e.message)
         except HTTPError as e:
             self.close(e.status_code, e.reason)
         except BaseException as e:
             self.close(500, str(e))
-
-    @coroutine
-    def opened(self, *args, **kwargs):
-        pass
 
     def enable_ping(self):
         return True

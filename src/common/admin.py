@@ -499,24 +499,28 @@ class AdminWSHandler(handler.AuthenticatedWSHandler):
         return action_class(self.application, self.token, self)
 
     @coroutine
-    def closed(self):
+    def on_closed(self):
         if self.action:
-            yield self.action.closed()
+            yield self.action.on_closed()
+
+            logging.info("Closed admin WS session: {0}".format(str(self.action.__class__.__name__)))
 
     def on_message(self, message):
         tornado.ioloop.IOLoop.current().add_callback(self.action.on_message, message)
 
     @coroutine
-    def opened(self, *args, **kwargs):
+    def on_opened(self, *args, **kwargs):
         if self.action:
             try:
-                yield self.action.opened(**self.action.context)
+                yield self.action.on_opened(**self.action.context)
             except ActionError as e:
                 self.close(400, e.title)
             except StreamCommandError as e:
                 self.close(e.code, e.message)
             except ValidationError as e:
                 self.close(400, e.message)
+
+            logging.info("Opened admin WS session: {0}".format(str(self.action.__class__.__name__)))
 
     @coroutine
     def prepared(self, *args, **kwargs):
@@ -625,7 +629,7 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
             raise Return(response)
 
     @coroutine
-    def closed(self):
+    def on_closed(self):
         pass
 
     @coroutine
@@ -641,7 +645,7 @@ class StreamAdminController(AdminController, jsonrpc.JsonRPC):
         pass
 
     @coroutine
-    def opened(self, *args, **kwargs):
+    def on_opened(self, *args, **kwargs):
         """
         Called when the action is already opened.
         It's the websockets now, not a http connection, raising HTTPError won't help,
