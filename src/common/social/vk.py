@@ -3,19 +3,20 @@ from tornado.gen import coroutine, Return
 import tornado.httpclient
 import urllib
 import ujson
-import jwt
 import abc
 
 import common.social
 
 
-class GoogleAPI(common.social.SocialNetworkAPI):
+class VKAPI(common.social.SocialNetworkAPI):
     __metaclass__ = abc.ABCMeta
 
-    GOOGLE_OAUTH = "https://www.googleapis.com/oauth2/"
+    VK_OAUTH = "https://oauth.vk.com/"
+    VK_API = "https://api.vk.com/method/"
+    VERSION = "5.68"
 
     def __init__(self, cache):
-        super(GoogleAPI, self).__init__("google", cache)
+        super(VKAPI, self).__init__("vk", cache)
 
     def __parse_friend__(self, friend):
         try:
@@ -30,19 +31,17 @@ class GoogleAPI(common.social.SocialNetworkAPI):
 
     @coroutine
     def api_auth(self, gamespace, code, redirect_uri):
-
         private_key = yield self.get_private_key(gamespace)
 
         fields = {
             "code": code,
             "client_id": private_key.app_id,
             "client_secret": private_key.app_secret,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code"
+            "redirect_uri": redirect_uri
         }
 
         try:
-            response = yield self.api_post("token", fields)
+            response = yield self.api_oauth_post("access_token", fields)
         except tornado.httpclient.HTTPError as e:
             raise common.social.APIError(
                 e.code,
@@ -50,29 +49,24 @@ class GoogleAPI(common.social.SocialNetworkAPI):
         else:
             payload = ujson.loads(response.body)
 
-            refresh_token = payload.get("refresh_token", None)
             access_token = payload["access_token"]
             expires_in = payload["expires_in"]
-            id_token = payload["id_token"]
-
-            user_info = jwt.decode(id_token, verify=False)
-            username = user_info["sub"]
+            username = str(payload["user_id"])
 
             result = common.social.AuthResponse(
                 access_token=access_token,
                 expires_in=expires_in,
-                refresh_token=refresh_token,
                 username=username,
                 import_social=True)
 
             raise Return(result)
 
     @coroutine
-    def api_get(self, operation, fields, v="v4", **kwargs):
+    def api_get(self, operation, fields, **kwargs):
 
         fields.update(**kwargs)
         result = yield self.client.fetch(
-            GoogleAPI.GOOGLE_OAUTH + v + "/" + operation + "?" +
+            VKAPI.VK_API + operation + "?" +
             urllib.urlencode(fields))
 
         raise Return(result)
@@ -100,45 +94,40 @@ class GoogleAPI(common.social.SocialNetworkAPI):
     def api_get_user_info(self, access_token=None):
         try:
             response = yield self.api_get(
-                "userinfo",
-                {},
-                v="v2",
+                "users.get",
+                {
+                    "fields": "photo_200"
+                },
+                v=VKAPI.VERSION,
                 access_token=access_token)
 
         except tornado.httpclient.HTTPError as e:
             raise common.social.APIError(e.code, e.response.body)
         else:
             data = ujson.loads(response.body)
-            raise Return(GoogleAPI.process_user_info(data))
+            raise Return(VKAPI.process_user_info(data["response"][0]))
 
     @coroutine
-    def api_post(self, operation, fields, v="v4", **kwargs):
+    def api_oauth_post(self, operation, fields, **kwargs):
 
         fields.update(**kwargs)
         result = yield self.client.fetch(
-            GoogleAPI.GOOGLE_OAUTH + v + "/" + operation,
+            VKAPI.VK_OAUTH + operation,
             method="POST",
             body=urllib.urlencode(fields))
 
         raise Return(result)
 
     @coroutine
-    def api_refresh_token(self, refresh_token, gamespace):
+    def api_post(self, operation, fields, **kwargs):
 
-        private_key = yield self.get_private_key(gamespace)
+        fields.update(**kwargs)
+        result = yield self.client.fetch(
+            VKAPI.VK_API + operation,
+            method="POST",
+            body=urllib.urlencode(fields))
 
-        try:
-            response = yield self.api_post("token", {
-                "client_id": private_key.app_id,
-                "client_secret": private_key.app_secret,
-                "refresh_token": refresh_token,
-                "grant_type": "refresh_token"
-            })
-        except tornado.httpclient.HTTPError as e:
-            raise common.social.APIError(e.code, e.response.body)
-        else:
-            data = ujson.loads(response.body)
-            raise Return(data)
+        raise Return(result)
 
     @coroutine
     def get(self, url, headers=None, **kwargs):
@@ -152,22 +141,20 @@ class GoogleAPI(common.social.SocialNetworkAPI):
     @staticmethod
     def process_user_info(data):
         return {
-            "name": data["name"],
-            "avatar": data["picture"],
-            "language": data["locale"],
-            "email": data["email"]
+            "name": u"{0} {1}".format(data["first_name"], data["last_name"]),
+            "avatar": data["photo_200"]
         }
 
     def new_private_key(self, data):
-        return GooglePrivateKey(data)
+        return VKPrivateKey(data)
 
 
-class GooglePrivateKey(common.social.SocialPrivateKey):
+class VKPrivateKey(common.social.SocialPrivateKey):
     def __init__(self, key):
-        super(GooglePrivateKey, self).__init__(key)
+        super(VKPrivateKey, self).__init__(key)
 
-        self.app_secret = self.data["web"]["client_secret"]
-        self.app_id = self.data["web"]["client_id"]
+        self.app_secret = self.data["client_secret"]
+        self.app_id = self.data["client_id"]
 
     def get_app_id(self):
         return self.app_id

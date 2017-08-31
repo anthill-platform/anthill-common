@@ -4,7 +4,7 @@ from . import define
 # Internal
 
 define("api_version",
-       default="",
+       default="0.1",
        help="Service API version",
        type=str)
 
