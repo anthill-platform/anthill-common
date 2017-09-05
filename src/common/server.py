@@ -79,7 +79,7 @@ class Server(tornado.web.Application):
 
         auth_callback = self.get_auth_callback()
         if auth_callback:
-            handlers.append((r"/callback", auth_callback))
+            handlers.append((r"/auth_callback", auth_callback))
 
         if options.serve_static:
             handlers.append((r'/static/(.*)', tornado.web.StaticFileHandler,

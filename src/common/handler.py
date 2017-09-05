@@ -122,7 +122,7 @@ class AuthenticatedHandlerMixin(object):
         args = {
             "scopes": ",".join(set(needed_scopes)),
             "gamespace": self.get_gamespace(),
-            "redirect": self.application.get_host() + "/callback?" + urllib.urlencode({
+            "redirect": self.application.get_host() + "/auth_callback?" + urllib.urlencode({
                 "after": self.request.uri
             }),
             "as": (self.authorize_as() or "")
@@ -476,7 +476,10 @@ class RootHandler(RequestHandler, JsonHandlerMixin):
             self.set_header("X-Service-Host", self.application.get_host())
             if self.application.api_version:
                 self.set_header("X-API-Version", self.application.api_version)
-            self.dumps(self.application.metadata)
+
+            if hasattr(self.application, "metadata"):
+                self.dumps(self.application.metadata)
+
             return
 
         super(RootHandler, self).get()
