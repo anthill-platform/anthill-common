@@ -61,7 +61,7 @@ class FacebookAPI(common.social.SocialNetworkAPI):
 
         try:
             response = yield self.get(
-                "v2.5/me/invitable_friends",
+                "v2.5/me/friends",
                 {},
                 private_key=private_key, access_token=access_token)
 
@@ -71,11 +71,13 @@ class FacebookAPI(common.social.SocialNetworkAPI):
             data = ujson.loads(response.body)
 
             friends = data["data"]
-            result = filter(
-                bool,
-                [self.__parse_friend__(friend) for friend in friends])
 
-            raise Return(result)
+            raise Return({
+                friend["id"]: {
+                    "display_name": friend["name"]
+                }
+                for friend in friends
+            })
 
     @coroutine
     def api_get_user_info(self, gamespace, access_token=None, fields=None, parse=True):

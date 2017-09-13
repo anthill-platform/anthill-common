@@ -38,7 +38,8 @@ class GoogleAPI(common.social.SocialNetworkAPI):
             "client_id": private_key.app_id,
             "client_secret": private_key.app_secret,
             "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code"
+            "grant_type": "authorization_code",
+            "access_type": "offline"
         }
 
         try:
@@ -76,25 +77,6 @@ class GoogleAPI(common.social.SocialNetworkAPI):
             urllib.urlencode(fields))
 
         raise Return(result)
-
-    @coroutine
-    def api_get_friends(self, access_token=None):
-        try:
-            response = yield self.get(
-                "https://www.googleapis.com/plus/v1/people/me/people/visible",
-                access_token=access_token)
-
-        except tornado.httpclient.HTTPError as e:
-            raise common.social.APIError(e.code, e.response.body)
-        else:
-            data = ujson.loads(response.body)
-
-            friends = data["items"]
-            result = filter(
-                bool,
-                [self.__parse_friend__(friend) for friend in friends])
-
-            raise Return(result)
 
     @coroutine
     def api_get_user_info(self, access_token=None):

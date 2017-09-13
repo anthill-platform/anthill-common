@@ -98,7 +98,6 @@ class Server(tornado.web.Application):
 
         self.internal = None
         self.shutting_down = False
-        self.graceful_shutdown = options.graceful_shutdown
 
         tornado.ioloop.IOLoop.instance().set_blocking_log_threshold(0.5)
 
@@ -330,30 +329,19 @@ class Server(tornado.web.Application):
         if self.http_server:
             self.http_server.stop()
 
-        if self.graceful_shutdown:
+        io_loop = tornado.ioloop.IOLoop.instance()
 
+        @coroutine
+        def process_shutdown():
             for model in self.get_models():
                 if hasattr(model, "stopped"):
-                    tornado.ioloop.IOLoop.instance().add_callback(model.stopped)
+                    yield model.stopped()
 
-            logging.info('Will shutdown in %s seconds ...', MAX_WAIT_SECONDS_BEFORE_SHUTDOWN)
-            io_loop = tornado.ioloop.IOLoop.instance()
-
-            deadline = time.time() + MAX_WAIT_SECONDS_BEFORE_SHUTDOWN
-
-            # noinspection PyProtectedMember
-            def stop_loop():
-                now = time.time()
-                if now < deadline and (io_loop._callbacks or io_loop._timeouts):
-                    io_loop.add_timeout(now + 1, stop_loop)
-                else:
-                    io_loop.stop()
-                    logging.info('Stopped!')
-            stop_loop()
-
-        else:
-            tornado.ioloop.IOLoop.instance().stop()
+        def shutdown_callback(f):
+            io_loop.stop()
             logging.info('Stopped!')
+
+        io_loop.add_future(process_shutdown(), shutdown_callback)
 
 
 def init():

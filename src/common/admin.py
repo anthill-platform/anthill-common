@@ -302,6 +302,9 @@ class AdminUploadHandler(handler.AuthenticatedHandler):
                 "redirect-to": e.action
             }
 
+            if e.service:
+                result["redirect-service"] = e.service
+
             if e.notice:
                 result["notice"] = e.notice
 
@@ -357,6 +360,9 @@ class AdminHandler(handler.AuthenticatedHandler):
                 "context": e.context,
                 "redirect-to": e.action
             }
+
+            if e.service:
+                result["redirect-service"] = e.service
 
             if e.notice:
                 result["notice"] = e.notice
@@ -432,6 +438,9 @@ class AdminHandler(handler.AuthenticatedHandler):
                 "context": e.context,
                 "redirect-to": e.action
             }
+
+            if e.service:
+                result["redirect-service"] = e.service
 
             if e.notice:
                 result["notice"] = e.notice
@@ -576,10 +585,11 @@ class Redirect(Exception):
     :param message (optional) A message to display to the user after redirect,
     :param context: context of the redirection
     """
-    def __init__(self, action, message=None, **context):
+    def __init__(self, action, message=None, service=None, **context):
         self.action = action
         self.context = context
         self.notice = message
+        self.service = service
 
 
 class RedirectStream(Exception):

@@ -74,8 +74,12 @@ class VKAPI(common.social.SocialNetworkAPI):
     @coroutine
     def api_get_friends(self, access_token=None):
         try:
-            response = yield self.get(
-                "https://www.googleapis.com/plus/v1/people/me/people/visible",
+            response = yield self.api_get(
+                "friends.get",
+                {
+                    "fields": "photo_200"
+                },
+                v=VKAPI.VERSION,
                 access_token=access_token)
 
         except tornado.httpclient.HTTPError as e:
@@ -83,18 +87,29 @@ class VKAPI(common.social.SocialNetworkAPI):
         else:
             data = ujson.loads(response.body)
 
-            friends = data["items"]
-            result = filter(
-                bool,
-                [self.__parse_friend__(friend) for friend in friends])
+            response = data["response"]
+            items = response["items"]
 
-            raise Return(result)
+            def parse_item(item):
+                result = {
+                    "display_name": item["first_name"] + " " + item["last_name"]
+                }
+
+                if "photo_200" in item:
+                    result["avatar"] = item["photo_200"]
+
+                return result
+
+            raise Return({
+                str(item["id"]): parse_item(item)
+                for item in items
+            })
 
     @coroutine
     def api_get_user_info(self, access_token=None):
         try:
             response = yield self.api_get(
-                "users.get",
+                "friends.get",
                 {
                     "fields": "photo_200"
                 },
