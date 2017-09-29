@@ -240,10 +240,10 @@ class Flags(object):
         if value:
             self._flags.add(flag)
         else:
-            self._flags.remove(flag)
+            self._flags.discard(flag)
 
     def clear(self, flag):
-        self._flags.remove(flag)
+        self._flags.discard(flag)
 
     def dump(self):
         return ",".join(self._flags)
