@@ -834,16 +834,18 @@ def method(title, style, **data):
     return result
 
 
-def notice(title, text):
+def notice(title, text, style="info"):
     """
     A notice panel.
     :param title: Notice title
     :param text: Notice information
+    :param style: Notice style (info, danger, success, default)
     """
     return {
         "class": "notice",
         "title": title,
-        "text": text
+        "text": text,
+        "style": style
     }
 
 
