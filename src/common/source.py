@@ -138,6 +138,8 @@ class ProjectBuild(object):
 class SourceCodeRoot(object):
     DEFAULT_BRANCH = "master"
 
+    executor = EXECUTOR
+
     def __init__(self, root_dir, ssh_private_key=None):
         self.ssh_private_key = ssh_private_key
         self.root_dir = root_dir
@@ -156,6 +158,20 @@ class SourceCodeRoot(object):
                           branch_name=branch_name, ssh_private_key=self.ssh_private_key)
         IOLoop.current().spawn_callback(project.__do_setup__)
         return project
+
+    def git_environment(self):
+        return Git().custom_environment(GIT_SSH_COMMAND=Project.git_ssh_command(self.ssh_private_key))
+
+    @run_on_executor
+    @validate(url="str")
+    def validate_repository_url(self, url):
+        try:
+            with self.git_environment():
+                Git().ls_remote(url)
+        except GitError:
+            return False
+        else:
+            return True
 
 
 class Project(object):
@@ -412,16 +428,6 @@ class DatabaseSourceCodeRoot(object):
             raise NoSuchProjectError()
 
         raise Return(SourceProjectAdapter(result))
-
-    @run_on_executor
-    @validate(url="str")
-    def validate_repository_url(self, url):
-        try:
-            Git().ls_remote(url)
-        except GitError:
-            return False
-        else:
-            return True
 
     @coroutine
     @validate(gamespace_id="int", application_name="str", repository_url="str", repository_branch="str")

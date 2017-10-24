@@ -1,7 +1,7 @@
 
 from tornado.gen import coroutine, Return
 from tornado.web import HTTPError
-from common.options import options, default
+from common.options import options
 
 import tornado.httpclient
 
