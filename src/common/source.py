@@ -297,7 +297,7 @@ class Project(object):
     def git_ssh_command(private_key):
         if private_key is None:
             return "ssh"
-        return "ssh -i {0}".format(private_key)
+        return "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {0}".format(private_key)
 
     def git_environment(self):
         return Git().custom_environment(GIT_SSH_COMMAND=Project.git_ssh_command(self.ssh_private_key))
