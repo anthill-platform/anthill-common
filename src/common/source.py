@@ -20,7 +20,7 @@ class SourceCodeError(Exception):
         return str(self.code) + ": " + self.message
 
 
-EXECUTOR = ThreadPoolExecutor()
+EXECUTOR = ThreadPoolExecutor(4)
 
 
 class ProjectBuild(object):
