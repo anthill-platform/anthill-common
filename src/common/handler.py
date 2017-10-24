@@ -396,8 +396,8 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
             except TypeError as e:
                 logging.exception("JsonRPCWSHandler TypeError")
                 raise jsonrpc.JsonRPCError(400, "Bad arguments: " + e.args[0])
-            except jsonrpc.JsonRPCError as e:
-                raise e
+            except jsonrpc.JsonRPCError:
+                raise
             except ValidationError as e:
                 raise jsonrpc.JsonRPCError(400, e.message)
             except Exception as e:
