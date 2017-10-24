@@ -63,13 +63,13 @@ class ProjectBuild(object):
         os.mkdir(self.build_dir)
 
         try:
-            with self.project.git_environment():
-                try:
-                    working_dir = os.path.abspath(self.project.repo_dir)
-                    g = Git(working_dir)
-                except GitError as e:
-                    raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
+            try:
+                working_dir = os.path.abspath(self.project.repo_dir)
+                g = Git(working_dir)
+            except GitError as e:
+                raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
 
+            with self.project.git_environment(g):
                 logging.info("Checking if the commit {0} into repo {1} exists".format(
                     self.commit,
                     self.project.remote_url
@@ -78,6 +78,7 @@ class ProjectBuild(object):
                 try:
                     exists = g.cat_file("-t", self.commit) == "commit"
                 except GitError as e:
+                    # noinspection PyUnresolvedReferences
                     if e.status == 128:
                         exists = False
                     else:
@@ -108,6 +109,7 @@ class ProjectBuild(object):
                     try:
                         exists = g.cat_file("-t", self.commit) == "commit"
                     except GitError as e:
+                        # noinspection PyUnresolvedReferences
                         if e.status == 128:
                             exists = False
                         else:
@@ -159,15 +161,16 @@ class SourceCodeRoot(object):
         IOLoop.current().spawn_callback(project.__do_setup__)
         return project
 
-    def git_environment(self):
-        return Git().custom_environment(GIT_SSH_COMMAND=Project.git_ssh_command(self.ssh_private_key))
+    def git_environment(self, g):
+        return g.custom_environment(GIT_SSH_COMMAND=Project.git_ssh_command(self.ssh_private_key))
 
     @run_on_executor
     @validate(url="str")
     def validate_repository_url(self, url):
         try:
-            with self.git_environment():
-                Git().ls_remote(url)
+            g = Git()
+            with self.git_environment(g):
+                g.ls_remote(url)
         except GitError:
             return False
         else:
@@ -248,50 +251,49 @@ class Project(object):
 
     @run_on_executor
     def get_commits_history(self, amount=20):
-        with self.git_environment():
-            try:
-                return self.repo.iter_commits(self.branch_name, max_count=amount)
-            except GitError as e:
-                raise SourceCodeError(500, "Failed to list commit history: " + str(e.message))
+        try:
+            return self.repo.iter_commits(self.branch_name, max_count=amount)
+        except GitError as e:
+            raise SourceCodeError(500, "Failed to list commit history: " + str(e.message))
 
     @run_on_executor
     def check_commit(self, commit):
-        with self.git_environment():
-            try:
-                working_dir = os.path.abspath(self.repo_dir)
-                g = Git(working_dir)
+        try:
+            working_dir = os.path.abspath(self.repo_dir)
+            g = Git(working_dir)
+            with self.git_environment(g):
                 exists = g.cat_file("-t", commit) == "commit"
-            except GitError as e:
-                return False
-            else:
-                return exists
+        except GitError as e:
+            return False
+        else:
+            return exists
 
     @run_on_executor
     def pull_and_get_latest_commit(self):
-        with self.git_environment():
             try:
                 working_dir = os.path.abspath(self.repo_dir)
                 g = Git(working_dir)
-                instance = g(work_tree=working_dir)
-                logging.info("Pulling updates from repo {0}".format(self.repo_dir))
-                instance.pull()
-                return instance.log("-n", "1", self.branch_name, "--pretty=format:%H")
+                with self.git_environment(g):
+                    instance = g(work_tree=working_dir)
+                    logging.info("Pulling updates from repo {0}".format(self.repo_dir))
+                    instance.pull()
+                    return instance.log("-n", "1", self.branch_name, "--pretty=format:%H")
             except GitError as e:
                 return None
 
     @run_on_executor
     def pull(self):
-        with self.git_environment():
-            try:
-                working_dir = os.path.abspath(self.repo_dir)
-                g = Git(working_dir)
+        try:
+            working_dir = os.path.abspath(self.repo_dir)
+            g = Git(working_dir)
+            with self.git_environment(g):
                 instance = g(work_tree=working_dir)
                 logging.info("Pulling updates from repo {0}".format(self.repo_dir))
                 instance.pull()
-            except GitError as e:
-                return False
-            else:
-                return True
+        except GitError as e:
+            return False
+        else:
+            return True
 
     @staticmethod
     def git_ssh_command(private_key):
@@ -299,8 +301,8 @@ class Project(object):
             return "ssh"
         return "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {0}".format(private_key)
 
-    def git_environment(self):
-        return Git().custom_environment(GIT_SSH_COMMAND=Project.git_ssh_command(self.ssh_private_key))
+    def git_environment(self, g):
+        return g.custom_environment(GIT_SSH_COMMAND=Project.git_ssh_command(self.ssh_private_key))
 
     @run_on_executor
     def __clone_repo__(self):
@@ -310,13 +312,15 @@ class Project(object):
             self.branch_name
         ))
 
-        with self.git_environment():
-            Repo.clone_from(self.remote_url, self.repo_dir,
-                            branch=self.branch_name,
-                            single_branch=True,
-                            shallow_submodules=True,
-                            recurse_submodules=".",
-                            bare=True)
+        Repo.clone_from(self.remote_url, self.repo_dir,
+                        branch=self.branch_name,
+                        single_branch=True,
+                        shallow_submodules=True,
+                        recurse_submodules=".",
+                        bare=True,
+                        env={
+                            "GIT_SSH_COMMAND": Project.git_ssh_command(self.ssh_private_key)
+                        })
 
 
 class SourceCommitAdapter(object):
