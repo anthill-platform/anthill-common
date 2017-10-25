@@ -15,9 +15,9 @@ class EnvironmentClient(object):
         self.cache = cache
 
     @coroutine
-    def list_apps(self, gamespace_id):
+    def list_apps(self):
         @cached(kv=self.cache,
-                h="apps:" + str(gamespace_id),
+                h="environment_apps",
                 json=True)
         @coroutine
         def get():
@@ -25,8 +25,7 @@ class EnvironmentClient(object):
             try:
                 response = yield self.internal.request(
                     "environment",
-                    "get_apps",
-                    gamespace_id=gamespace_id)
+                    "get_apps")
             except internal.InternalError:
                 logging.exception("Failed to list apps")
                 raise Return([])
@@ -41,17 +40,16 @@ class EnvironmentClient(object):
         })
 
     @coroutine
-    def get_app_info(self, gamespace_id, app_name):
+    def get_app_info(self, app_name):
         @cached(kv=self.cache,
-                h=lambda: "app:" + app_name + ":" + str(gamespace_id),
+                h=lambda: "environment_app:" + app_name,
                 json=True)
         @coroutine
         def get():
             response = yield self.internal.request(
                 "environment",
                 "get_app_info",
-                app_name=app_name,
-                gamespace_id=gamespace_id)
+                app_name=app_name)
 
             raise Return(response)
 
@@ -66,11 +64,11 @@ class EnvironmentClient(object):
                 raise e
 
     @coroutine
-    def get_app_title(self, gamespace_id, app_name):
-        app_info = yield self.get_app_info(gamespace_id, app_name)
+    def get_app_title(self, app_name):
+        app_info = yield self.get_app_info(app_name)
         raise Return(app_info["title"])
 
     @coroutine
-    def get_app_versions(self, gamespace_id, app_name):
-        app_info = yield self.get_app_info(gamespace_id, app_name)
+    def get_app_versions(self, app_name):
+        app_info = yield self.get_app_info(app_name)
         raise Return(app_info["versions"])
