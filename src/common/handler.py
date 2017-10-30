@@ -30,6 +30,11 @@ class JsonHandler(JsonHandlerMixin, RequestHandler):
     pass
 
 
+class CORSHandlerMixin(object):
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+
+
 class AuthCallbackHandler(RequestHandler):
     def access_required(self):
         return []
@@ -265,7 +270,7 @@ class AuthenticatedHandlerMixin(object):
         return None
 
 
-class AuthenticatedHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, RequestHandler):
+class AuthenticatedHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, CORSHandlerMixin, RequestHandler):
     """
     A handler that deals with access tokens internally. Parses and validates access_token field,
     if passed, and makes possible to reference token object by self.token
@@ -286,7 +291,8 @@ class AuthorizedUser:
         self.profile = None
 
 
-class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, tornado.websocket.WebSocketHandler):
+class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, CORSHandlerMixin,
+                             tornado.websocket.WebSocketHandler):
     """
     A handler like the one above, but used for the web sockets
     """
