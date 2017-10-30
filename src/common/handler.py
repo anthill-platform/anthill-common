@@ -291,7 +291,7 @@ class AuthorizedUser:
         self.profile = None
 
 
-class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, CORSHandlerMixin,
+class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin,
                              tornado.websocket.WebSocketHandler):
     """
     A handler like the one above, but used for the web sockets
