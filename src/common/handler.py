@@ -10,7 +10,7 @@ import tornado.ioloop
 
 from tornado.gen import coroutine, Return, is_future
 from tornado.web import HTTPError, RequestHandler
-from tornado.websocket import WebSocketClosedError
+from tornado.websocket import WebSocketClosedError, StreamClosedError
 from validate import ValidationError
 
 import access
@@ -26,16 +26,17 @@ class JsonHandlerMixin(object):
         self.write(ujson.dumps(data, escape_forward_slashes=False))
 
 
-class JsonHandler(JsonHandlerMixin, RequestHandler):
-    pass
-
-
-class CORSHandlerMixin(object):
+class AnthillRequestHandler(RequestHandler):
     def set_default_headers(self):
+        self.set_header("API-Version", self.application.api_version)
         self.set_header("Access-Control-Allow-Origin", "*")
 
 
-class AuthCallbackHandler(RequestHandler):
+class JsonHandler(JsonHandlerMixin, AnthillRequestHandler):
+    pass
+
+
+class AuthCallbackHandler(AnthillRequestHandler):
     def access_required(self):
         return []
 
@@ -270,13 +271,13 @@ class AuthenticatedHandlerMixin(object):
         return None
 
 
-class AuthenticatedHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, CORSHandlerMixin, RequestHandler):
+class AuthenticatedHandler(JsonHandlerMixin, AuthenticatedHandlerMixin, AnthillRequestHandler):
     """
     A handler that deals with access tokens internally. Parses and validates access_token field,
     if passed, and makes possible to reference token object by self.token
     """
     def __init__(self, application, request, **kwargs):
-        RequestHandler.__init__(
+        AnthillRequestHandler.__init__(
             self,
             application,
             request,
@@ -481,13 +482,11 @@ class LogoutHandler(AuthenticatedHandler):
         self.redirect("/")
 
 
-class RootHandler(RequestHandler, JsonHandlerMixin):
+class RootHandler(AnthillRequestHandler, JsonHandlerMixin):
     def get(self):
         if self.application.debug_mode:
             self.set_header("X-Service-Name", self.application.name)
             self.set_header("X-Service-Host", self.application.get_host())
-            if self.application.api_version:
-                self.set_header("X-API-Version", self.application.api_version)
 
             if hasattr(self.application, "metadata"):
                 self.dumps(self.application.metadata)

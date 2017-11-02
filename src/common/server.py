@@ -121,7 +121,7 @@ class Server(tornado.web.Application):
             ("/user", handlers.UserHandler)
         ]
 
-        This binds a /user request to a UserHandler (overridden from RequestHandler)
+        This binds a /user request to a UserHandler (overridden from AnthillRequestHandler)
 
         """
         return []
