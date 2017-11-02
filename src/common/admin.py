@@ -90,6 +90,7 @@ class AdminController(object):
         self.application = app
         self.token = token
         self.context = {}
+        self.audit_log = None
 
         if self.token:
             self.gamespace = self.token.get(access.AccessToken.GAMESPACE)
@@ -116,6 +117,12 @@ class AdminController(object):
             return self.context[key]
         except KeyError:
             raise ActionError(title="Missing context")
+
+    def audit(self, icon, message):
+        self.audit_log = {
+            "icon": icon,
+            "message": message
+        }
 
     def render(self, data):
         """
@@ -238,6 +245,9 @@ class AdminUploadHandler(handler.AuthenticatedHandler):
 
             if e.notice:
                 result["notice"] = e.notice
+
+        if self.action.audit_log:
+            self.set_header("Audit-Log", ujson.dumps(self.action.audit_log))
 
         self.dumps(result)
 
@@ -446,6 +456,9 @@ class AdminHandler(handler.AuthenticatedHandler):
                 result["notice"] = e.notice
         else:
             result = self.action.render(data)
+
+        if self.action.audit_log:
+            self.set_header("Audit-Log", ujson.dumps(self.action.audit_log))
 
         self.dumps(result)
 
