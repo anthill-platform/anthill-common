@@ -4,8 +4,8 @@ from . import define
 # Internal
 
 define("api_version",
-       default="",
-       help="Service API version",
+       default="0.2",
+       help="Service API version to return to the users in header X-API-Version",
        type=str)
 
 define("internal_restrict",
@@ -94,9 +94,4 @@ define("serve_static",
 define("debug",
        default=True,
        help="Is debug mode enabled (includes full stack trace)",
-       type=bool)
-
-define("graceful_shutdown",
-       default=False,
-       help="Whether should service shutdown gracefully or not",
        type=bool)
