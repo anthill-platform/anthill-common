@@ -424,6 +424,10 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
     # noinspection PyMethodOverriding
     @coroutine
     def write_data(self, context, data):
+
+        if not self.stream or self.stream.closed():
+            return
+
         try:
             f = self.write_message(data)
 
@@ -431,6 +435,8 @@ class JsonRPCWSHandler(AuthenticatedWSHandler, jsonrpc.JsonRPC):
                 return
 
             yield f
+        except StreamClosedError:
+            raise jsonrpc.JsonRPCError(599, "WebSockets is closed")
         except WebSocketClosedError:
             raise jsonrpc.JsonRPCError(599, "WebSockets closed")
 

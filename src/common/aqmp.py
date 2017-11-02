@@ -176,6 +176,7 @@ class AMQPConnection(AMQPObject):
                 except:
                     pass
         except:
+            self._do_reconnect()
             log.exception('Failed to replace connection')
 
     def connect(self, timeout=None):

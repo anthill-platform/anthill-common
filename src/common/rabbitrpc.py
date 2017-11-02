@@ -192,9 +192,9 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
     def write_object(self, context, data, **payload):
 
         channel = context.channel
-
-        if not channel.is_active:
-            return
+        
+        if not channel or not channel.is_open:
+            raise jsonrpc.JsonRPCError(503, "Channel is closed")
 
         routing_key = context.routing_key()
         reply_to = context.reply_to()
