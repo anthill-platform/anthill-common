@@ -93,7 +93,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         yield super(Internal, self).listen(self.broker, service_name, on_receive)
 
     @staticmethod
-    def __parse_result__(result, use_json=True):
+    def __parse_result__(result, use_json=True, return_headers=False):
         data = result.body
 
         if not use_json:
@@ -107,10 +107,14 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         except (KeyError, ValueError):
             raise IndexError(400, "Body is corrupted: " + data)
 
+        if return_headers:
+            return content, result.headers
+
         return content
 
     @coroutine
-    def post(self, service, url, data, use_json=True, discover_service=True, timeout=20, network="internal"):
+    def post(self, service, url, data, use_json=True, discover_service=True,
+             timeout=20, network="internal", return_headers=False):
         """
         Posts a http request to a certain service
 
@@ -122,6 +126,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
             if False, <service> is just server location.
         :param timeout: a request timeout in seconds
         :param network: a network to make request in. Default is internal network
+        :param return_headers: if True, a tuple (result, headers) instead of just result will be returned
         :return: Requested data
         """
         if discover_service:
@@ -154,7 +159,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         finally:
             logging.info(timer.done())
 
-        raise Return(Internal.__parse_result__(result, use_json=use_json))
+        raise Return(Internal.__parse_result__(result, use_json=use_json, return_headers=return_headers))
 
     @coroutine
     def request(self, service, method, timeout=jsonrpc.JSONRPC_TIMEOUT, *args, **kwargs):

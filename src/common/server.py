@@ -274,6 +274,7 @@ class Server(tornado.web.Application):
         listen_method = kinds[kind]
         listen_method(addresses)
 
+        logging.info("API version is '{0}'".format(self.api_version))
         logging.info("Listening '{0}' on '{1}'".format(kind, addresses))
         logging.info("Host is '{0}'".format(self.get_host()))
 
