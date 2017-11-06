@@ -294,6 +294,12 @@ def _str(field_name, field):
     return field
 
 
+def _bytes(field_name, field):
+    if not isinstance(field, bytes):
+        raise ValidationError("Field {0} is not bytes".format(field_name))
+    return field
+
+
 def _str_name(field_name, field):
     if not isinstance(field, (str, unicode)):
         raise ValidationError("Field {0} is not a valid string".format(field_name))
@@ -345,6 +351,7 @@ VALIDATORS = {
     "int": _int,
     "float": _float,
     "str": _str,
+    "bytes": _bytes,
     "string": _str,
     "str_name": _str_name,
     "str_tags": _str_tags,

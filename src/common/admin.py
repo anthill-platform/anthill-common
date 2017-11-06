@@ -40,6 +40,7 @@ from validate import ValidationError
 
 REDIRECT = 444
 ACTION_ERROR = 445
+BINARY_FILE = 446
 
 
 class ActionError(Exception):
@@ -358,6 +359,11 @@ class AdminHandler(handler.AuthenticatedHandler):
         except ActionError as e:
             result = AdminController.render_error(e.title, e.links)
             self.set_status(ACTION_ERROR, "Action-Error")
+        except BinaryFile as e:
+            self.set_header("File-Name", e.name)
+            self.set_status(BINARY_FILE, "Binary-File")
+            self.write(e.contents)
+            return
         except TypeError as e:
             logging.exception("TypeError")
             raise HTTPError(400, e.message)
@@ -439,6 +445,11 @@ class AdminHandler(handler.AuthenticatedHandler):
         except ValidationError as e:
             result = AdminController.render_error(e.message, [])
             self.set_status(ACTION_ERROR, "Action-Error")
+        except BinaryFile as e:
+            self.set_header("File-Name", e.name)
+            self.set_status(BINARY_FILE, "Binary-File")
+            self.write(e.contents)
+            return
         except Redirect as e:
 
             # special status 470 means redirect
@@ -603,6 +614,17 @@ class Redirect(Exception):
         self.context = context
         self.notice = message
         self.service = service
+
+
+class BinaryFile(Exception):
+    """
+    Raise in AdminController to let the player download a file.
+    :param contents File contents
+    :param name File name
+    """
+    def __init__(self, contents, name):
+        self.contents = contents
+        self.name = name
 
 
 class RedirectStream(Exception):
