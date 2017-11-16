@@ -279,6 +279,7 @@ class Project(object):
                     instance.pull()
                     return instance.log("-n", "1", self.branch_name, "--pretty=format:%H")
             except GitError as e:
+                logging.exception("Failed to pull repo {0}".format(self.repo_dir))
                 return None
 
     @run_on_executor
@@ -291,6 +292,7 @@ class Project(object):
                 logging.info("Pulling updates from repo {0}".format(self.repo_dir))
                 instance.pull()
         except GitError as e:
+            logging.exception("Failed to pull repo {0}".format(self.repo_dir))
             return False
         else:
             return True
