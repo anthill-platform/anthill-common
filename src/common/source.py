@@ -1,4 +1,3 @@
-
 from tornado.gen import coroutine, Return, Future, Task
 from tornado.ioloop import IOLoop
 from tornado.concurrent import run_on_executor
@@ -8,7 +7,10 @@ from git import Repo, Git, GitError, InvalidGitRepositoryError
 from database import DatabaseError
 from validate import validate, ValidationError
 
-import os, logging, weakref, shutil
+import os
+import logging
+import shutil
+import tempfile
 
 
 class SourceCodeError(Exception):
@@ -69,39 +71,9 @@ class ProjectBuild(object):
             except GitError as e:
                 raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
 
-            with self.project.git_environment(g):
-                logging.info("Checking if the commit {0} into repo {1} exists".format(
-                    self.commit,
-                    self.project.remote_url
-                ))
-
-                try:
-                    exists = g.cat_file("-t", self.commit) == "commit"
-                except GitError as e:
-                    # noinspection PyUnresolvedReferences
-                    if e.status == 128:
-                        exists = False
-                    else:
-                        raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
-
-                if not exists:
-                    logging.info("No such commit: {0}, trying to update the repo {1}".format(
-                        self.commit,
-                        self.project.remote_url
-                    ))
-
-                    try:
-                        up_to_date = "up-to-date" in g(work_tree=working_dir).pull()
-                    except GitError as e:
-                        raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
-
-                    if up_to_date:
-                        raise SourceCodeError(404, "No such commit in the repo {0}: {1}".format(
-                            self.project.remote_url,
-                            self.commit
-                        ))
-
-                    logging.info("Updated, checking if the commit {0} into repo {1} exists again".format(
+            with PrivateSSHKeyContext(ssh_private_key=self.project.ssh_private_key) as ssh_private_key_filename:
+                with git_ssh_environment(g, ssh_private_key_filename=ssh_private_key_filename):
+                    logging.info("Checking if the commit {0} into repo {1} exists".format(
                         self.commit,
                         self.project.remote_url
                     ))
@@ -116,25 +88,96 @@ class ProjectBuild(object):
                             raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
 
                     if not exists:
-                        raise SourceCodeError(404, "No such commit in the repo {0}: {1}".format(
-                            self.project.remote_url,
-                            self.commit
+                        logging.info("No such commit: {0}, trying to update the repo {1}".format(
+                            self.commit,
+                            self.project.remote_url
                         ))
 
-                logging.info("Checking out repo {0} into {1} (commit {2})".format(
-                    self.project.remote_url,
-                    self.build_dir,
-                    self.commit
-                ))
+                        try:
+                            up_to_date = "up-to-date" in g(work_tree=working_dir).pull()
+                        except GitError as e:
+                            raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
 
-                try:
-                    g(work_tree=os.path.abspath(self.build_dir)).checkout(self.commit, "--", ".")
-                except GitError as e:
-                    raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
+                        if up_to_date:
+                            raise SourceCodeError(404, "No such commit in the repo {0}: {1}".format(
+                                self.project.remote_url,
+                                self.commit
+                            ))
+
+                        logging.info("Updated, checking if the commit {0} into repo {1} exists again".format(
+                            self.commit,
+                            self.project.remote_url
+                        ))
+
+                        try:
+                            exists = g.cat_file("-t", self.commit) == "commit"
+                        except GitError as e:
+                            # noinspection PyUnresolvedReferences
+                            if e.status == 128:
+                                exists = False
+                            else:
+                                raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
+
+                        if not exists:
+                            raise SourceCodeError(404, "No such commit in the repo {0}: {1}".format(
+                                self.project.remote_url,
+                                self.commit
+                            ))
+
+                    logging.info("Checking out repo {0} into {1} (commit {2})".format(
+                        self.project.remote_url,
+                        self.build_dir,
+                        self.commit
+                    ))
+
+                    try:
+                        g(work_tree=os.path.abspath(self.build_dir)).checkout(self.commit, "--", ".")
+                    except GitError as e:
+                        raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
 
         except Exception as e:
             shutil.rmtree(self.build_dir, ignore_errors=True)
             raise e
+
+
+class PrivateSSHKeyContext(object):
+    """
+    This context manager class creates temporary file with ssh_private_key in it,
+        and conveniently returns path to it, taking care to remove the file afterwards:
+
+    with PrivateSSHKeyWrapper("private ssh key string") as key_path:
+        use key_path here for ssh operations
+
+    key_path deleted afterwards
+
+    """
+
+    def __init__(self, ssh_private_key=None):
+        self.ssh_private_key = ssh_private_key
+        self.sys_fd = None
+        self.key_path = None
+
+    def __enter__(self):
+        if self.ssh_private_key is None:
+            return None
+
+        self.sys_fd, self.key_path = tempfile.mkstemp()
+
+        with open(self.key_path, 'w') as f:
+            f.write(self.ssh_private_key)
+            f.write("\n")
+
+        return self.key_path
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.sys_fd:
+            os.close(self.sys_fd)
+
+
+def git_ssh_environment(g, ssh_private_key_filename=None):
+    if ssh_private_key_filename:
+        return g.custom_environment(GIT_SSH_COMMAND=Project.git_ssh_command(ssh_private_key_filename))
+    return g.custom_environment()
 
 
 class SourceCodeRoot(object):
@@ -142,39 +185,48 @@ class SourceCodeRoot(object):
 
     executor = EXECUTOR
 
-    def __init__(self, root_dir, ssh_private_key=None):
-        self.ssh_private_key = ssh_private_key
+    def __init__(self, root_dir):
         self.root_dir = root_dir
         self.projects = {}
 
         if not os.path.isdir(root_dir):
             os.makedirs(root_dir)
 
-    def project(self, project_name, remote_url, branch_name=DEFAULT_BRANCH):
-        project = self.projects.get(project_name)
+    @staticmethod
+    def __get_project_key__(gamespace_id, project_name):
+        return str(gamespace_id) + "_" + str(project_name)
+
+    def project(self, gamespace_id, project_name, remote_url, branch_name=DEFAULT_BRANCH, ssh_private_key=""):
+        project_key = SourceCodeRoot.__get_project_key__(gamespace_id, project_name)
+
+        project = self.projects.get(project_key)
         if project:
             return project
 
-        project_dir = os.path.join(self.root_dir, project_name)
-        project = Project(project_dir, remote_url,
-                          branch_name=branch_name, ssh_private_key=self.ssh_private_key)
+        gamespace_dir = os.path.join(self.root_dir, str(gamespace_id))
+        if not os.path.isdir(gamespace_dir):
+            os.mkdir(gamespace_dir)
+
+        project_dir = os.path.join(gamespace_dir, project_name)
+        project = Project(project_dir, remote_url, branch_name=branch_name, ssh_private_key=ssh_private_key)
+        self.projects[project_key] = project
+
         IOLoop.current().spawn_callback(project.__do_setup__)
         return project
 
-    def git_environment(self, g):
-        return g.custom_environment(GIT_SSH_COMMAND=Project.git_ssh_command(self.ssh_private_key))
-
     @run_on_executor
     @validate(url="str")
-    def validate_repository_url(self, url):
-        try:
-            g = Git()
-            with self.git_environment(g):
-                g.ls_remote(url)
-        except GitError:
-            return False
-        else:
-            return True
+    def validate_repository_url(self, url, ssh_private_key=None):
+
+        with PrivateSSHKeyContext(ssh_private_key) as ssh_private_key_filename:
+            try:
+                g = Git()
+                with git_ssh_environment(g, ssh_private_key_filename=ssh_private_key_filename):
+                    g.ls_remote(url)
+            except GitError:
+                return False
+            else:
+                return True
 
 
 class Project(object):
@@ -261,37 +313,40 @@ class Project(object):
         try:
             working_dir = os.path.abspath(self.repo_dir)
             g = Git(working_dir)
-            with self.git_environment(g):
-                exists = g.cat_file("-t", commit) == "commit"
-        except GitError as e:
+            with PrivateSSHKeyContext(ssh_private_key=self.ssh_private_key) as ssh_private_key_filename:
+                with git_ssh_environment(g, ssh_private_key_filename=ssh_private_key_filename):
+                    exists = g.cat_file("-t", commit) == "commit"
+        except GitError:
             return False
         else:
             return exists
 
     @run_on_executor
     def pull_and_get_latest_commit(self):
-            try:
-                working_dir = os.path.abspath(self.repo_dir)
-                g = Git(working_dir)
-                with self.git_environment(g):
+        try:
+            working_dir = os.path.abspath(self.repo_dir)
+            g = Git(working_dir)
+            with PrivateSSHKeyContext(ssh_private_key=self.ssh_private_key) as ssh_private_key_filename:
+                with git_ssh_environment(g, ssh_private_key_filename=ssh_private_key_filename):
                     instance = g(work_tree=working_dir)
                     logging.info("Pulling updates from repo {0}".format(self.repo_dir))
                     instance.pull()
                     return instance.log("-n", "1", self.branch_name, "--pretty=format:%H")
-            except GitError as e:
-                logging.exception("Failed to pull repo {0}".format(self.repo_dir))
-                return None
+        except GitError:
+            logging.exception("Failed to pull repo {0}".format(self.repo_dir))
+            return None
 
     @run_on_executor
     def pull(self):
         try:
             working_dir = os.path.abspath(self.repo_dir)
             g = Git(working_dir)
-            with self.git_environment(g):
-                instance = g(work_tree=working_dir)
-                logging.info("Pulling updates from repo {0}".format(self.repo_dir))
-                instance.pull()
-        except GitError as e:
+            with PrivateSSHKeyContext(ssh_private_key=self.ssh_private_key) as ssh_private_key_filename:
+                with git_ssh_environment(g, ssh_private_key_filename=ssh_private_key_filename):
+                    instance = g(work_tree=working_dir)
+                    logging.info("Pulling updates from repo {0}".format(self.repo_dir))
+                    instance.pull()
+        except GitError:
             logging.exception("Failed to pull repo {0}".format(self.repo_dir))
             return False
         else:
@@ -303,9 +358,6 @@ class Project(object):
             return "ssh"
         return "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i {0}".format(private_key)
 
-    def git_environment(self, g):
-        return g.custom_environment(GIT_SSH_COMMAND=Project.git_ssh_command(self.ssh_private_key))
-
     @run_on_executor
     def __clone_repo__(self):
         logging.info("Cloning repository {0} into {1} branch {2} only".format(
@@ -314,31 +366,40 @@ class Project(object):
             self.branch_name
         ))
 
-        Repo.clone_from(self.remote_url, self.repo_dir,
-                        branch=self.branch_name,
-                        single_branch=True,
-                        shallow_submodules=True,
-                        recurse_submodules=".",
-                        bare=True,
-                        env={
-                            "GIT_SSH_COMMAND": Project.git_ssh_command(self.ssh_private_key)
-                        })
+        with PrivateSSHKeyContext(ssh_private_key=self.ssh_private_key) as ssh_private_key_filename:
+            env = {}
+
+            if ssh_private_key_filename:
+                env["GIT_SSH_COMMAND"] = Project.git_ssh_command(ssh_private_key_filename)
+
+            Repo.clone_from(
+                self.remote_url, self.repo_dir,
+                branch=self.branch_name,
+                single_branch=True,
+                shallow_submodules=True,
+                recurse_submodules=".",
+                bare=True,
+                env=env)
 
 
 class SourceCommitAdapter(object):
     def __init__(self, data):
+        self.gamespace_id = data.get("gamespace_id")
         self.name = data.get("application_name")
         self.version = data.get("application_version")
         self.repository_commit = data.get("repository_commit")
         self.repository_url = data.get("repository_url")
         self.repository_branch = data.get("repository_branch")
+        self.ssh_private_key = data.get("ssh_private_key")
 
 
 class SourceProjectAdapter(object):
     def __init__(self, data):
+        self.gamespace_id = data.get("gamespace_id")
         self.name = data.get("application_name")
         self.repository_url = data.get("repository_url")
         self.repository_branch = data.get("repository_branch")
+        self.ssh_private_key = data.get("ssh_private_key")
 
 
 class NoSuchSourceError(Exception):
@@ -349,6 +410,7 @@ class NoSuchProjectError(Exception):
     pass
 
 
+# noinspection SqlResolve
 class DatabaseSourceCodeRoot(object):
     executor = EXECUTOR
 
@@ -436,8 +498,13 @@ class DatabaseSourceCodeRoot(object):
         raise Return(SourceProjectAdapter(result))
 
     @coroutine
-    @validate(gamespace_id="int", application_name="str", repository_url="str", repository_branch="str")
-    def update_project(self, gamespace_id, application_name, repository_url, repository_branch):
+    @validate(gamespace_id="int", application_name="str", repository_url="str", repository_branch="str",
+              ssh_private_key="str")
+    def update_project(self, gamespace_id, application_name, repository_url, repository_branch, ssh_private_key):
+
+        if ssh_private_key:
+            if ("BEGIN RSA PRIVATE KEY" not in ssh_private_key) or ("END RSA PRIVATE KEY" not in ssh_private_key):
+                raise ValidationError("'ssh_private_key' appears to be corrupted.")
 
         if not repository_branch:
             raise ValidationError("'repository_branch' must not be empty")
@@ -446,12 +513,14 @@ class DatabaseSourceCodeRoot(object):
             yield self.db.execute(
                 """
                 INSERT INTO `{0}_application_settings`
-                (`gamespace_id`, `application_name`, `repository_url`, `repository_branch`)
-                VALUES (%s, %s, %s, %s)
+                (`gamespace_id`, `application_name`, `repository_url`, `repository_branch`, `ssh_private_key`)
+                VALUES (%s, %s, %s, %s, %s)
                 ON DUPLICATE KEY 
-                UPDATE `repository_url`=VALUES(`repository_url`), `repository_branch`=VALUES(`repository_branch`);
+                UPDATE `repository_url`=VALUES(`repository_url`), 
+                       `repository_branch`=VALUES(`repository_branch`),
+                       `ssh_private_key`=VALUES(`ssh_private_key`);
                 """.format(self.tables_prefix),
-                gamespace_id, application_name, repository_url, repository_branch
+                gamespace_id, application_name, repository_url, repository_branch, ssh_private_key
             )
         except DatabaseError as e:
             raise SourceCodeError(500, e.args[1])

@@ -4,6 +4,7 @@ from tornado.concurrent import run_on_executor
 from concurrent.futures import ThreadPoolExecutor
 from subprocess import call, CalledProcessError
 
+from source import PrivateSSHKeyContext
 from options import options
 
 import os
@@ -121,13 +122,7 @@ class KeyCDNDeploymentMethod(DeploymentMethod):
     @run_on_executor
     def deploy(self, gamespace_id, source_file_path, target_directory_name, target_file_name):
 
-        sys_fd, key_path = tempfile.mkstemp()
-
-        with open(key_path, 'w') as f:
-            f.write(self.pri)
-            f.write("\n")
-
-        try:
+        with PrivateSSHKeyContext(self.pri) as key_path:
             try:
                 mk_args = [
                     key_path,
@@ -165,8 +160,6 @@ class KeyCDNDeploymentMethod(DeploymentMethod):
 
             if return_code:
                 raise DeploymentError("Rsync failed with code: " + str(return_code))
-        finally:
-            os.close(sys_fd)
 
         return self.url + "/" + os.path.join(self.directory, target_directory_name, target_file_name)
 
