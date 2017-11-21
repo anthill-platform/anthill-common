@@ -194,6 +194,21 @@ def _json_dict_of_ints(field_name, field):
     }
 
 
+def _json_dict_of_strings(field_name, field):
+    try:
+        ujson.dumps(field)
+    except (TypeError, ValueError):
+        raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
+
+    if not isinstance(field, dict):
+        raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
+
+    return {
+        _str(name, name): _str(field_name + "." + name, value)
+        for name, value in field.iteritems()
+    }
+
+
 def _json_dict_of_dicts(field_name, field):
     try:
         ujson.dumps(field)
@@ -344,6 +359,7 @@ VALIDATORS = {
     "json_dict": _json_dict,
     "json_list": _json_list,
     "json_dict_of_ints": _json_dict_of_ints,
+    "json_dict_of_strings": _json_dict_of_strings,
     "json_dict_of_dicts": _json_dict_of_dicts,
     "json_list_of_strings": _json_list_of_strings,
     "json_list_of_str_name": _json_list_of_str_name,
