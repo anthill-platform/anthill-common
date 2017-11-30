@@ -64,7 +64,10 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
             request = tornado.httpclient.HTTPRequest(
                 service_location + "/" + url + "?" + urllib.urlencode(data),
                 method='GET',
-                request_timeout=timeout
+                request_timeout=timeout,
+                headers={
+                    "X-Api-Version": options.api_version
+                }
             )
 
             result = yield self.client.fetch(request)
@@ -147,7 +150,10 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
                 service_location + "/" + url,
                 method='POST',
                 body=urllib.urlencode(data),
-                request_timeout=timeout)
+                request_timeout=timeout,
+                headers={
+                    "X-Api-Version": options.api_version
+                })
 
             result = yield self.client.fetch(request)
 
