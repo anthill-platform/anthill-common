@@ -119,10 +119,70 @@ class AdminController(object):
         except KeyError:
             raise ActionError(title="Missing context")
 
-    def audit(self, icon, message):
+    def audit(self, icon, message, only_if=False, **updates):
+        """
+        This will cause admin service to log audit entry upon this request.
+
+        :param icon: font-awesome icon without "fa-" prefix
+        :param message: User-friendly message on what happened
+        :param only_if: Do actually log audit only if updates has changed entries (see below)
+        :param updates: a dict with updated parameters on this request. Keys will be transformed
+                        to user-friendly title, and the value can be simply a string,
+                        or a tuple value with old and new data. If value is a tuple, and both old and new data are
+                        the same, the record will be ignored.
+
+        For example,
+
+        self.audit("mobile", "Updated an application",
+                   only_if=True,
+                   application_name=("old value", "new value"),
+                   application_title=("same", "same")) # ignored
+
+        Will cause admin service to log such entry only if application_name or application_title have changed:
+
+        <mobile icon> <author> <date> Updated an application:
+            Application Name changed from `old value` to `new value`.
+
+        self.audit("plus", "Created an application",
+                   application_name="app_x",
+                   application_title="App X")
+
+        <plus icon> <author> <date> Created an application:
+            Application Name: app_x
+            Application Title: App X
+
+        """
+
+        changes = {}
+        dirty = not only_if
+
+        def diff(a, b):
+            if isinstance(a, (dict, list)) or isinstance(b, (dict, list)):
+                return ujson.dumps(a, sort_keys=True) != ujson.dumps(b, sort_keys=True)
+            return str(a) != str(b)
+
+        for key, values in updates.iteritems():
+            if isinstance(values, tuple):
+                if len(values) == 2:
+                    if diff(values[0], values[1]):
+                        dirty = True
+                        changes[key] = {
+                            "old": values[0],
+                            "new": values[1]
+                        }
+            else:
+                changes[key] = values
+
+        if not dirty:
+            return
+
         self.audit_log = {
             "icon": icon,
-            "message": message
+            "message": message,
+            "payload": {
+                "changes": changes,
+                "context": self.context
+            }
         }
 
     def render(self, data):
