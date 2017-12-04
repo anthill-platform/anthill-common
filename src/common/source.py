@@ -328,9 +328,9 @@ class Project(object):
             g = Git(working_dir)
             with PrivateSSHKeyContext(ssh_private_key=self.ssh_private_key) as ssh_private_key_filename:
                 with git_ssh_environment(g, ssh_private_key_filename=ssh_private_key_filename):
-                    instance = g(work_tree=working_dir)
+                    instance = g()
                     logging.info("Pulling updates from repo {0}".format(self.repo_dir))
-                    instance.pull()
+                    instance.remote("update", "--prune")
                     return instance.log("-n", "1", self.branch_name, "--pretty=format:%H")
         except GitError:
             logging.exception("Failed to pull repo {0}".format(self.repo_dir))
@@ -343,9 +343,9 @@ class Project(object):
             g = Git(working_dir)
             with PrivateSSHKeyContext(ssh_private_key=self.ssh_private_key) as ssh_private_key_filename:
                 with git_ssh_environment(g, ssh_private_key_filename=ssh_private_key_filename):
-                    instance = g(work_tree=working_dir)
+                    instance = g()
                     logging.info("Pulling updates from repo {0}".format(self.repo_dir))
-                    instance.pull()
+                    instance.remote("update", "--prune")
         except GitError:
             logging.exception("Failed to pull repo {0}".format(self.repo_dir))
             return False
@@ -378,7 +378,7 @@ class Project(object):
                 single_branch=True,
                 shallow_submodules=True,
                 recurse_submodules=".",
-                bare=True,
+                mirror=True,
                 env=env)
 
 
