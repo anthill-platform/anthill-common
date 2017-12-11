@@ -149,7 +149,7 @@ class KeyCDNDeploymentMethod(DeploymentMethod):
                     ]
 
                     return_code = call(
-                        ["rsync -avz --no-motd --chmod=u=rwX,g=rX "
+                        ["rsync -rvz --no-motd "
                          "-e 'ssh -i {0} -o StrictHostKeyChecking=no' "
                          "{1} {2}@{3}:zones/{4}/{5}".format(*args)], shell=True)
 
