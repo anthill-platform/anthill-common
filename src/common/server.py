@@ -93,7 +93,9 @@ class Server(tornado.web.Application):
             handlers=handlers, debug=options.debug
         )
 
-        self.token_cache = access.AccessTokenCache()
+        if self.token_cache_enabled():
+            self.token_cache = access.AccessTokenCache()
+
         self.name = None
 
         self.internal = None
@@ -221,11 +223,20 @@ class Server(tornado.web.Application):
         """
         return []
 
+    def token_cache_enabled(self):
+        """
+        Is token cache enabled on this server or no (any use of access tokens will be disabled otherwise)
+        :return:
+        """
+        return True
+
     @coroutine
     def started(self):
         self.name = options.name
 
-        self.token_cache.load()
+        if self.token_cache_enabled():
+            self.token_cache.load()
+
         self.init_discovery()
         self.internal = internal.Internal()
 
