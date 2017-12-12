@@ -167,8 +167,14 @@ class AuthenticatedHandlerMixin(object):
         current_user = self.current_user
         return (current_user is not None) and (current_user.token.has_scopes(scopes))
 
+    @coroutine
     def __token_needs_refresh__(self, token, db):
         internal_ = internal.Internal()
+
+        token_cache = self.application.token_cache
+
+        if not token_cache:
+            return
 
         try:
             response = yield internal_.request(
@@ -188,7 +194,6 @@ class AuthenticatedHandlerMixin(object):
 
             if token.is_valid():
 
-                token_cache = self.application.token_cache
                 if db is None:
                     db = token_cache.acquire()
 
@@ -206,38 +211,40 @@ class AuthenticatedHandlerMixin(object):
 
     @coroutine
     def prepare(self):
-        token = AuthenticatedHandlerMixin.validate(
-            self.get_argument("access_token", None))
-
-        if token is None:
-            token = AuthenticatedHandlerMixin.validate(
-                self.get_cookie("access_token", None))
 
         token_cache = self.application.token_cache
+        if token_cache:
 
-        if token:
-            db = token_cache.acquire()
+            token = AuthenticatedHandlerMixin.validate(
+                self.get_argument("access_token", None))
 
-            try:
-                valid = yield token_cache.validate_db(token, db=db)
+            if token is None:
+                token = AuthenticatedHandlerMixin.validate(
+                    self.get_cookie("access_token", None))
 
-                if valid:
-                    self.token = token
-                else:
-                    self.token_invalidated(token)
-                    token = None
+            if token:
+                db = token_cache.acquire()
 
-                if token:
-                    time_left = token.time_left()
+                try:
+                    valid = yield token_cache.validate_db(token, db=db)
 
-                    self.set_header("Access-Token-Time-Left", str(time_left))
+                    if valid:
+                        self.token = token
+                    else:
+                        self.token_invalidated(token)
+                        token = None
 
-                    if token.needs_refresh():
-                        self.__token_needs_refresh__(token, db)
+                    if token:
+                        time_left = token.time_left()
 
-            finally:
-                if db is not None:
-                    yield db.release()
+                        self.set_header("Access-Token-Time-Left", str(time_left))
+
+                        if token.needs_refresh():
+                            yield self.__token_needs_refresh__(token, db)
+
+                finally:
+                    if db is not None:
+                        yield db.release()
 
         result = self.prepared(*self.path_args, **self.path_kwargs)
         if is_future(result):

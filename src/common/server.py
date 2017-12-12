@@ -95,6 +95,8 @@ class Server(tornado.web.Application):
 
         if self.token_cache_enabled():
             self.token_cache = access.AccessTokenCache()
+        else:
+            self.token_cache = None
 
         self.name = None
 
