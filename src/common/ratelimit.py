@@ -25,14 +25,22 @@ class RateLimitLock(object):
         self._allowed = False
 
         db = self.limit.kv.acquire()
-        pipe = db.pipeline()
+
+        keys = [
+            "rate:" + self.action + ":" + self.key + ":" + str(range_)
+            for range_, time_ in RateLimit.RANGES
+        ]
 
         try:
-            for range_, time_ in RateLimit.RANGES:
-                key_ = "rate:" + self.action + ":" + self.key + ":" + str(range_)
-                pipe.incr(key_)
-        finally:
+            values = yield Task(db.mget, keys)
+            pipe = db.pipeline()
+
+            for key, value in zip(keys, values):
+                if value is not None:
+                    pipe.incr(key)
+
             yield Task(pipe.execute)
+        finally:
             yield db.release()
 
 
@@ -42,7 +50,7 @@ class RateLimit(object):
 
     Initialization (see constructor):
 
-    RateLimit(kv, {
+    RateLimit({
         "start_server": (1, 15),
         "upload_score": (10, 60)
     })
@@ -66,7 +74,6 @@ class RateLimit(object):
 
     def __init__(self, actions):
         """
-        :param kv: A key-value store
         :param actions: A disc of tuples where:
 
             A key: is action to be limited
@@ -101,30 +108,29 @@ class RateLimit(object):
 
         db = self.kv.acquire()
 
-        try:
-            keys = ["rate:" + action + ":" + key + ":" + str(range_) for range_, time_ in RateLimit.RANGES]
+        keys = [
+            "rate:" + action + ":" + key + ":" + str(range_)
+            for range_, time_ in RateLimit.RANGES
+        ]
 
+        try:
             values = yield Task(db.mget, keys)
+
+            for value in values:
+                if value is not None and to_int(value) <= 0:
+                    raise RateLimitExceeded()
 
             pipe = db.pipeline()
 
-            try:
-                for (range_, time_), value in zip(RateLimit.RANGES, values):
-                    key_ = "rate:" + action + ":" + key + ":" + str(range_)
+            for (range_, time_), value in zip(RateLimit.RANGES, values):
+                key_ = "rate:" + action + ":" + key + ":" + str(range_)
 
-                    if value is None:
-                        pipe.setex(key_, requests_in_time * time_, max_requests * range_ - 1)
-                    else:
-                        value = to_int(value)
+                if value is None:
+                    pipe.setex(key_, requests_in_time * time_, max_requests * range_ - 1)
+                else:
+                    pipe.decr(key_)
 
-                        if value <= 0:
-                            raise RateLimitExceeded()
-                        else:
-                            pipe.decr(key_)
-            finally:
-                yield Task(pipe.execute)
-
+            yield Task(pipe.execute)
             raise Return(RateLimitLock(self, action, key))
-
         finally:
             yield db.release()
