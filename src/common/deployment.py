@@ -149,7 +149,7 @@ class KeyCDNDeploymentMethod(DeploymentMethod):
                     ]
 
                     return_code = call(
-                        ["rsync -rtvz -e 'ssh -i {0} -o StrictHostKeyChecking=no' "
+                        ["rsync -rtvz --chmod=640 -e 'ssh -i {0} -o StrictHostKeyChecking=no' "
                          "{1} {2}@{3}:{4}/{5}".format(*args)], shell=True)
 
             except CalledProcessError as e:
