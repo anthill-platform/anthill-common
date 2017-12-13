@@ -135,8 +135,8 @@ class KeyCDNDeploymentMethod(DeploymentMethod):
                 # rsync cannot upload a file to a directory that does not exists, so
                 # use this dirty hack to create the directory beforehand
                 return_code = call(
-                    ["rsync -avz --no-motd -e 'ssh -i {0} -o StrictHostKeyChecking=no' "
-                     "/dev/null {1}@{2}:zones/{3}/{4}".format(*mk_args)], shell=True)
+                    ["rsync -rtvz -e 'ssh -i {0} -o StrictHostKeyChecking=no' "
+                     "/dev/null {1}@{2}:{3}/{4}".format(*mk_args)], shell=True)
 
                 if not return_code:
                     args = [
@@ -149,9 +149,8 @@ class KeyCDNDeploymentMethod(DeploymentMethod):
                     ]
 
                     return_code = call(
-                        ["rsync -avz --no-motd "
-                         "-e 'ssh -i {0} -o StrictHostKeyChecking=no' "
-                         "{1} {2}@{3}:zones/{4}/{5}".format(*args)], shell=True)
+                        ["rsync -rtvz -e 'ssh -i {0} -o StrictHostKeyChecking=no' "
+                         "{1} {2}@{3}:{4}/{5}".format(*args)], shell=True)
 
             except CalledProcessError as e:
                 raise DeploymentError("Rsync failed with code: " + str(e.returncode))
