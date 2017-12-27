@@ -417,6 +417,7 @@ class DatabaseSourceCodeRoot(object):
     def __init__(self, db, tables_prefix):
         self.db = db
         self.tables_prefix = tables_prefix
+        self.rc_cache = {}
 
     @coroutine
     @validate(gamespace_id="int", application_name="str", application_version="str", repository_commit="str")
@@ -457,6 +458,19 @@ class DatabaseSourceCodeRoot(object):
     @coroutine
     @validate(gamespace_id="int", application_name="str", application_version="str")
     def get_commit(self, gamespace_id, application_name, application_version):
+
+        _key = "commits:" + str(gamespace_id) + ":" + str(application_name) + ":" + str(application_version)
+        existing_futures = self.rc_cache.get(_key, None)
+
+        if existing_futures is not None:
+            future = Future()
+            existing_futures.append(future)
+            result = yield future
+            raise Return(result)
+
+        new_futures = []
+        self.rc_cache[_key] = new_futures
+
         try:
             result = yield self.db.get(
                 """
@@ -470,12 +484,26 @@ class DatabaseSourceCodeRoot(object):
                 """.format(self.tables_prefix), gamespace_id, application_name, application_version
             )
         except DatabaseError as e:
-            raise SourceCodeError(500, e.args[1])
+            _e = SourceCodeError(500, e.args[1])
+            for future in new_futures:
+                future.set_exception(_e)
+            del self.rc_cache[_key]
+            raise _e
 
         if not result:
-            raise NoSuchSourceError()
+            e = NoSuchSourceError()
+            for future in new_futures:
+                future.set_exception(e)
+            del self.rc_cache[_key]
+            raise e
 
-        raise Return(SourceCommitAdapter(result))
+        adapter = SourceCommitAdapter(result)
+
+        for future in new_futures:
+            future.set_result(adapter)
+        del self.rc_cache[_key]
+
+        raise Return(adapter)
 
     @coroutine
     @validate(gamespace_id="int", application_name="str")

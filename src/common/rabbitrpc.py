@@ -64,8 +64,8 @@ class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
 
         raise Return(context)
 
-    def __init__(self, mq, broker, connection_name=None, **kwargs):
-        super(JsonAMQPConnection, self).__init__(broker, connection_name, **kwargs)
+    def __init__(self, mq, broker, connection_name=None, channel_prefetch_count=0, **kwargs):
+        super(JsonAMQPConnection, self).__init__(broker, connection_name, channel_prefetch_count, **kwargs)
         self.named_channels = {}
         self.queues = {}
         self.consumers = {}
@@ -150,7 +150,8 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         self.listen_connection = JsonAMQPConnection(
             self,
             broker,
-            connection_name="rpc." + internal_name)
+            connection_name="rpc." + internal_name,
+            channel_prefetch_count=1024)
 
         try:
             yield with_timeout(datetime.timedelta(seconds=timeout),
@@ -158,7 +159,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         except TimeoutError:
             raise jsonrpc.JsonRPCError(500, "Failed to connect to the RabbitMQ")
 
-        self.listen_channel = yield self.listen_connection.channel()
+        self.listen_channel = yield self.listen_connection.channel(prefetch_count=1024)
 
         # initial incoming request queue
 
