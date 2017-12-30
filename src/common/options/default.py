@@ -82,6 +82,44 @@ define("auth_key_public",
        help="Location of public key required for access token verification.",
        type=str)
 
+# Monitoring
+
+define("enable_monitoring",
+       default=False,
+       help="Use monitoring or not.",
+       group="monitoring",
+       type=bool)
+
+define("monitoring_host",
+       default="127.0.0.1",
+       help="Monitoring server location (InfluxDB).",
+       group="monitoring",
+       type=str)
+
+define("monitoring_port",
+       default=8086,
+       help="Monitoring server port (InfluxDB).",
+       group="monitoring",
+       type=int)
+
+define("monitoring_db",
+       default="dev",
+       help="Monitoring server database name (InfluxDB).",
+       group="monitoring",
+       type=str)
+
+define("monitoring_username",
+       default="",
+       help="Monitoring server username name (InfluxDB).",
+       group="monitoring",
+       type=str)
+
+define("monitoring_password",
+       default="",
+       help="Monitoring server password name (InfluxDB).",
+       group="monitoring",
+       type=str)
+
 # Static content
 
 define("serve_static",

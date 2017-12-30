@@ -231,8 +231,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         if future is None:
             return
 
-        if method.reply_code:
-            future.set_exception(jsonrpc.JsonRPCError(method.reply_code, method.reply_text))
+        future.set_exception(jsonrpc.JsonRPCError(method.reply_code, method.reply_text))
 
     @coroutine
     def __get_context__(self, service):

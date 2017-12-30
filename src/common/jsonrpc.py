@@ -166,9 +166,9 @@ class JsonRPC(object):
                                            "Should be (only) one 'result' or 'error' field.")
                 return
 
-            if msg_id in self.handlers:
-                future = self.handlers.pop(msg_id)
-            else:
+            future = self.handlers.get(msg_id, None)
+
+            if future is None:
                 yield self.__write_error__(context, -32600, "Invalid Request", "Unknown message id")
                 return
 
@@ -210,7 +210,7 @@ class JsonRPC(object):
             result = yield with_timeout(datetime.timedelta(seconds=timeout), future)
         except TimeoutError:
             # remove the handler if timed out
-            self.handlers.pop(msg_id)
+            self.handlers.pop(msg_id, None)
             raise JsonRPCTimeout()
         else:
 

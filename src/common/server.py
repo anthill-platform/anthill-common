@@ -18,6 +18,7 @@ import access
 import discover
 import admin
 import jsonrpc
+import monitoring
 import handler
 import traceback
 import time
@@ -93,6 +94,16 @@ class Server(tornado.web.Application):
             handlers=handlers, debug=options.debug
         )
 
+        if options.enable_monitoring:
+            self.monitoring = monitoring.InfluxDBMonitoring(
+                host=options.monitoring_host,
+                port=options.monitoring_port,
+                db=options.monitoring_db,
+                username=options.monitoring_username,
+                password=options.monitoring_password)
+        else:
+            self.monitoring = None
+
         if self.token_cache_enabled():
             self.token_cache = access.AccessTokenCache()
         else:
@@ -104,6 +115,42 @@ class Server(tornado.web.Application):
         self.shutting_down = False
 
         tornado.ioloop.IOLoop.instance().set_blocking_log_threshold(0.5)
+
+    def monitor_action(self, action_name, values, **tags):
+        """
+        Called when some action that should be monitored happens
+        :param action_name: Is a name of the action. Domain-like names are appreciated, for example,
+            anthill.service_name.action.sub_action
+        :param values: A dict of string => float of values the action carries
+        :param tags: Useful tags for aggregation
+        :return:
+        """
+        if self.monitoring is not None:
+            self.monitoring.add_action(action_name, values, **tags)
+
+    def monitor_rate(self, action_name, name_property, **tags):
+        """
+        Called when some "rate" action (for example, registrations per minute) should be increased.
+        :param action_name: Domain-like name of the action. For example, anthill.service_name.web
+        :param name_property: A property of the action who's rate should go up
+        :param tags: Useful tags for aggregation
+        :return:
+        """
+        if self.monitoring is not None:
+            self.monitoring.add_rate(action_name, name_property, **tags)
+
+    def log_request(self, handler):
+        super(Server, self).log_request(handler)
+
+        if self.monitoring is not None:
+            if handler.get_status() < 400:
+                self.monitor_rate("anthill." + self.name + ".web", "request", api=self.api_version)
+            elif handler.get_status() < 500:
+                self.monitor_rate("anthill." + self.name + ".web", "request.4xx",
+                                  api=self.api_version, code=handler.get_status())
+            else:
+                self.monitor_rate("anthill." + self.name + ".web", "request.5xx",
+                                  api=self.api_version, code=handler.get_status())
 
     def __load_metadata__(self, data):
         data["version"] = self.api_version
