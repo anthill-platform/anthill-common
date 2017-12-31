@@ -237,7 +237,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
     @coroutine
     def __get_context__(self, service):
         try:
-            service_broker = yield discover.cache.get_service(service, network="broker", version=False)
+            service_broker = yield discover.cache.get_service(service, network="broker")
         except discover.DiscoveryError as e:
             raise jsonrpc.JsonRPCError(e.code, e.message)
 

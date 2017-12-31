@@ -47,7 +47,7 @@ class Discovery(object):
         })
 
     @coroutine
-    def get_service(self, service_id, network="internal", version=True):
+    def get_service(self, service_id, network="internal"):
         record_id = network + ":" + service_id
 
         if record_id in self.services:
@@ -59,10 +59,7 @@ class Discovery(object):
         try:
             response = yield self.internal.get(
                 self.discovery_service,
-                "service/" + service_id + "/" + network,
-                {
-                    "version": "true" if version else "false"
-                },
+                "service/" + service_id + "/" + network, {},
                 use_json=False,
                 discover_service=False)
 
