@@ -33,7 +33,6 @@ class Monitoring(object):
         """
         This method increments a "group.name" point of name actions per minute, that is flushed every minute.
         For example, to track number of errors per minute, you can do add_rate("web", "error") for every error occurred.
-        Tags are used only the first occurrence per minute.
         """
 
         raise NotImplementedError()
@@ -45,14 +44,6 @@ class Monitoring(object):
         """
 
         raise NotImplementedError()
-
-
-class InfluxDBMonitoringRateMeasurement(object):
-    def __init__(self, name, tags):
-        self.values = {
-            name: 1
-        }
-        self.tags = tags
 
 
 class InfluxDBMonitoring(Monitoring):
@@ -77,25 +68,35 @@ class InfluxDBMonitoring(Monitoring):
 
     def add_rate(self, name, name_property, **tags):
         existing_group = self.rates.get(name, None)
+        bundled_tags = frozenset(tags.iteritems())
+
         if existing_group is None:
-            self.rates[name] = InfluxDBMonitoringRateMeasurement(name, tags)
+            measurement = influx.Measurement(self.db, name=name)
+            measurement.set_tags(tags)
+            self.rates[name] = {
+                bundled_tags: measurement
+            }
         else:
-            existing_entry = existing_group.values.get(name_property, None)
-            if existing_entry is None:
-                existing_group.values[name_property] = 1
-            else:
-                existing_group.values[name_property] = existing_entry + 1
+            measurement = existing_group.get(bundled_tags, None)
+
+            if measurement is None:
+                measurement = influx.Measurement(self.db, name=name)
+                measurement.set_tags(tags)
+                existing_group[bundled_tags] = measurement
+
+        existing_entry = measurement.fields.get(name_property, None)
+        if existing_entry is None:
+            measurement.fields[name_property] = 1
+        else:
+            measurement.fields[name_property] = existing_entry + 1
 
     def __flush_rates__(self):
         if len(self.rates) == 0:
             return
 
-        for group_name, group in self.rates.iteritems():
-            measurement = influx.Measurement(self.db, name=group_name)
-            measurement.set_tags(group.tags)
-            measurement.fields = group.values
-
-            influx.add_measurement(measurement)
+        for group_name, measurements in self.rates.iteritems():
+            for measurement in measurements.itervalues():
+                influx.add_measurement(measurement)
 
         self.rates = {}
 

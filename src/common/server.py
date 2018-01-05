@@ -120,36 +120,37 @@ class Server(tornado.web.Application):
         """
         Called when some action that should be monitored happens
         :param action_name: Is a name of the action. Domain-like names are appreciated, for example,
-            anthill.service_name.action.sub_action
+            action.sub_action. Please note then anthill.{service-name}. will be prepended to this.
         :param values: A dict of string => float of values the action carries
         :param tags: Useful tags for aggregation
         :return:
         """
         if self.monitoring is not None:
-            self.monitoring.add_action(action_name, values, **tags)
+            self.monitoring.add_action("anthill." + self.name + "." + action_name, values, **tags)
 
     def monitor_rate(self, action_name, name_property, **tags):
         """
         Called when some "rate" action (for example, registrations per minute) should be increased.
-        :param action_name: Domain-like name of the action. For example, anthill.service_name.web
+        :param action_name: Domain-like name of the action. For example, "web", or "web.errors".
+            Please note then anthill.{service-name}. will be prepended to this.
         :param name_property: A property of the action who's rate should go up
         :param tags: Useful tags for aggregation
         :return:
         """
         if self.monitoring is not None:
-            self.monitoring.add_rate(action_name, name_property, **tags)
+            self.monitoring.add_rate("anthill." + self.name + "." + action_name, name_property, **tags)
 
     def log_request(self, handler):
         super(Server, self).log_request(handler)
 
         if self.monitoring is not None:
             if handler.get_status() < 400:
-                self.monitor_rate("anthill." + self.name + ".web", "request", api=self.api_version)
+                self.monitor_rate("web", "request", api=self.api_version)
             elif handler.get_status() < 500:
-                self.monitor_rate("anthill." + self.name + ".web", "request.4xx",
+                self.monitor_rate("web", "request.4xx",
                                   api=self.api_version, code=handler.get_status())
             else:
-                self.monitor_rate("anthill." + self.name + ".web", "request.5xx",
+                self.monitor_rate("web", "request.5xx",
                                   api=self.api_version, code=handler.get_status())
 
     def __load_metadata__(self, data):
