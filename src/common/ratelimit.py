@@ -5,6 +5,8 @@ from common.options import options
 import common.keyvalue
 from common import to_int
 
+import logging
+
 
 class RateLimitExceeded(Exception):
     pass
@@ -88,7 +90,26 @@ class RateLimit(object):
             db=options.rate_cache_db,
             max_connections=options.rate_cache_max_connections)
 
-        self.actions = actions
+        self.actions = {}
+
+        for action_name, value in actions.iteritems():
+            split = value.split(",")
+            if len(split) != 2:
+                logging.error("Bad tuple {0}: wrong number of arguments, expected {1}, got {2}".format(
+                    action_name, 2, len(split)
+                ))
+                continue
+
+            try:
+                value_a = int(split[0])
+                value_b = int(split[1])
+            except (KeyError, ValueError) as e:
+                logging.error("Bad tuple {0}: {1}".format(
+                    action_name, str(e)
+                ))
+                continue
+            else:
+                self.actions[action_name] = (value_a, value_b)
 
     @coroutine
     def limit(self, action, key):
