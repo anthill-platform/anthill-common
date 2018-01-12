@@ -402,7 +402,7 @@ class SourceProjectAdapter(object):
         self.ssh_private_key = data.get("ssh_private_key")
 
 
-class DefaultProjectAdapter(object):
+class ServerCodeAdapter(object):
     def __init__(self, data):
         self.gamespace_id = data.get("gamespace_id")
         self.repository_url = data.get("repository_url")
@@ -449,11 +449,11 @@ class DatabaseSourceCodeRoot(object):
 
     @coroutine
     @validate(gamespace_id="int", repository_commit="str")
-    def update_default_commit(self, gamespace_id, repository_commit):
+    def update_server_commit(self, gamespace_id, repository_commit):
         try:
             updated = yield self.db.execute(
                 """
-                UPDATE `{0}_default`
+                UPDATE `{0}_server`
                 SET `repository_commit`=%s
                 WHERE `gamespace_id`=%s
                 LIMIT 1;
@@ -484,11 +484,11 @@ class DatabaseSourceCodeRoot(object):
 
     @coroutine
     @validate(gamespace_id="int")
-    def delete_default_commit(self, gamespace_id):
+    def delete_server_commit(self, gamespace_id):
         try:
             deleted = yield self.db.execute(
                 """
-                UPDATE `{0}_default`
+                UPDATE `{0}_server`
                 SET `repository_commit`=NULL 
                 WHERE `gamespace_id`=%s
                 LIMIT 1;
@@ -571,9 +571,9 @@ class DatabaseSourceCodeRoot(object):
 
     @coroutine
     @validate(gamespace_id="int")
-    def get_default_commit(self, gamespace_id):
+    def get_server_commit(self, gamespace_id):
 
-        _key = "default-commits:" + str(gamespace_id)
+        _key = "server-commits:" + str(gamespace_id)
         existing_futures = self.rc_cache.get(_key, None)
 
         if existing_futures is not None:
@@ -589,7 +589,7 @@ class DatabaseSourceCodeRoot(object):
             result = yield self.db.get(
                 """
                 SELECT *
-                FROM `{0}_default` AS a
+                FROM `{0}_server` AS a
                 WHERE a.`gamespace_id`=%s
                 LIMIT 1;
                 """.format(self.tables_prefix), gamespace_id
@@ -608,7 +608,7 @@ class DatabaseSourceCodeRoot(object):
             del self.rc_cache[_key]
             raise e
 
-        adapter = DefaultProjectAdapter(result)
+        adapter = ServerCodeAdapter(result)
 
         for future in new_futures:
             future.set_result(adapter)
@@ -638,12 +638,12 @@ class DatabaseSourceCodeRoot(object):
 
     @coroutine
     @validate(gamespace_id="int")
-    def get_default_project(self, gamespace_id):
+    def get_server_project(self, gamespace_id):
         try:
             result = yield self.db.get(
                 """
                 SELECT *
-                FROM `{0}_default` AS a
+                FROM `{0}_server` AS a
                 WHERE a.`gamespace_id`=%s
                 LIMIT 1;
                 """.format(self.tables_prefix), gamespace_id
@@ -654,7 +654,7 @@ class DatabaseSourceCodeRoot(object):
         if not result:
             raise NoSuchProjectError()
 
-        raise Return(DefaultProjectAdapter(result))
+        raise Return(ServerCodeAdapter(result))
 
     @staticmethod
     def __validate_private_key__(ssh_private_key):
@@ -690,7 +690,7 @@ class DatabaseSourceCodeRoot(object):
 
     @coroutine
     @validate(gamespace_id="int", repository_url="str", repository_branch="str", ssh_private_key="str")
-    def update_default_project(self, gamespace_id, repository_url, repository_branch, ssh_private_key):
+    def update_server_project(self, gamespace_id, repository_url, repository_branch, ssh_private_key):
 
         DatabaseSourceCodeRoot.__validate_private_key__(ssh_private_key)
 
@@ -700,7 +700,7 @@ class DatabaseSourceCodeRoot(object):
         try:
             yield self.db.execute(
                 """
-                INSERT INTO `{0}_default`
+                INSERT INTO `{0}_server`
                 (`gamespace_id`, `repository_url`, `repository_branch`, `ssh_private_key`)
                 VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY 
