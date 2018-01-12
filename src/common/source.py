@@ -402,6 +402,15 @@ class SourceProjectAdapter(object):
         self.ssh_private_key = data.get("ssh_private_key")
 
 
+class DefaultProjectAdapter(object):
+    def __init__(self, data):
+        self.gamespace_id = data.get("gamespace_id")
+        self.repository_url = data.get("repository_url")
+        self.repository_branch = data.get("repository_branch")
+        self.ssh_private_key = data.get("ssh_private_key")
+        self.repository_commit = data.get("repository_commit")
+
+
 class NoSuchSourceError(Exception):
     pass
 
@@ -439,6 +448,24 @@ class DatabaseSourceCodeRoot(object):
             raise Return(updated)
 
     @coroutine
+    @validate(gamespace_id="int", repository_commit="str")
+    def update_default_commit(self, gamespace_id, repository_commit):
+        try:
+            updated = yield self.db.execute(
+                """
+                UPDATE `{0}_default`
+                SET `repository_commit`=%s
+                WHERE `gamespace_id`=%s
+                LIMIT 1;
+                """.format(self.tables_prefix),
+                repository_commit, gamespace_id
+            )
+        except DatabaseError as e:
+            raise SourceCodeError(500, e.args[1])
+        else:
+            raise Return(updated)
+
+    @coroutine
     @validate(gamespace_id="int", application_name="str", application_version="str")
     def delete_commit(self, gamespace_id, application_name, application_version):
         try:
@@ -456,8 +483,45 @@ class DatabaseSourceCodeRoot(object):
             raise Return(deleted)
 
     @coroutine
+    @validate(gamespace_id="int")
+    def delete_default_commit(self, gamespace_id):
+        try:
+            deleted = yield self.db.execute(
+                """
+                UPDATE `{0}_default`
+                SET `repository_commit`=NULL 
+                WHERE `gamespace_id`=%s
+                LIMIT 1;
+                """.format(self.tables_prefix),
+                gamespace_id
+            )
+        except DatabaseError as e:
+            raise SourceCodeError(500, e.args[1])
+        else:
+            raise Return(deleted)
+
+    @coroutine
+    @validate(gamespace_id="int", application_name="str")
+    def list_versions(self, gamespace_id, application_name):
+        try:
+            result = yield self.db.query(
+                """
+                SELECT *
+                FROM `{0}_application_versions` AS v
+                WHERE v.`gamespace_id`=%s AND v.`application_name`=%s;
+                """.format(self.tables_prefix), gamespace_id, application_name
+            )
+        except DatabaseError as e:
+            raise SourceCodeError(500, e.args[1])
+
+        raise Return({
+            item["application_version"]: SourceCommitAdapter(item)
+            for item in result
+        })
+
+    @coroutine
     @validate(gamespace_id="int", application_name="str", application_version="str")
-    def get_commit(self, gamespace_id, application_name, application_version):
+    def get_version_commit(self, gamespace_id, application_name, application_version):
 
         _key = "commits:" + str(gamespace_id) + ":" + str(application_name) + ":" + str(application_version)
         existing_futures = self.rc_cache.get(_key, None)
@@ -506,6 +570,53 @@ class DatabaseSourceCodeRoot(object):
         raise Return(adapter)
 
     @coroutine
+    @validate(gamespace_id="int")
+    def get_default_commit(self, gamespace_id):
+
+        _key = "default-commits:" + str(gamespace_id)
+        existing_futures = self.rc_cache.get(_key, None)
+
+        if existing_futures is not None:
+            future = Future()
+            existing_futures.append(future)
+            result = yield future
+            raise Return(result)
+
+        new_futures = []
+        self.rc_cache[_key] = new_futures
+
+        try:
+            result = yield self.db.get(
+                """
+                SELECT *
+                FROM `{0}_default` AS a
+                WHERE a.`gamespace_id`=%s
+                LIMIT 1;
+                """.format(self.tables_prefix), gamespace_id
+            )
+        except DatabaseError as e:
+            _e = SourceCodeError(500, e.args[1])
+            for future in new_futures:
+                future.set_exception(_e)
+            del self.rc_cache[_key]
+            raise _e
+
+        if not result:
+            e = NoSuchSourceError()
+            for future in new_futures:
+                future.set_exception(e)
+            del self.rc_cache[_key]
+            raise e
+
+        adapter = DefaultProjectAdapter(result)
+
+        for future in new_futures:
+            future.set_result(adapter)
+        del self.rc_cache[_key]
+
+        raise Return(adapter)
+
+    @coroutine
     @validate(gamespace_id="int", application_name="str")
     def get_project(self, gamespace_id, application_name):
         try:
@@ -526,13 +637,37 @@ class DatabaseSourceCodeRoot(object):
         raise Return(SourceProjectAdapter(result))
 
     @coroutine
+    @validate(gamespace_id="int")
+    def get_default_project(self, gamespace_id):
+        try:
+            result = yield self.db.get(
+                """
+                SELECT *
+                FROM `{0}_default` AS a
+                WHERE a.`gamespace_id`=%s
+                LIMIT 1;
+                """.format(self.tables_prefix), gamespace_id
+            )
+        except DatabaseError as e:
+            raise SourceCodeError(500, e.args[1])
+
+        if not result:
+            raise NoSuchProjectError()
+
+        raise Return(DefaultProjectAdapter(result))
+
+    @staticmethod
+    def __validate_private_key__(ssh_private_key):
+        if ssh_private_key:
+            if ("BEGIN RSA PRIVATE KEY" not in ssh_private_key) or ("END RSA PRIVATE KEY" not in ssh_private_key):
+                raise ValidationError("'ssh_private_key' appears to be corrupted.")
+
+    @coroutine
     @validate(gamespace_id="int", application_name="str", repository_url="str", repository_branch="str",
               ssh_private_key="str")
     def update_project(self, gamespace_id, application_name, repository_url, repository_branch, ssh_private_key):
 
-        if ssh_private_key:
-            if ("BEGIN RSA PRIVATE KEY" not in ssh_private_key) or ("END RSA PRIVATE KEY" not in ssh_private_key):
-                raise ValidationError("'ssh_private_key' appears to be corrupted.")
+        DatabaseSourceCodeRoot.__validate_private_key__(ssh_private_key)
 
         if not repository_branch:
             raise ValidationError("'repository_branch' must not be empty")
@@ -549,6 +684,31 @@ class DatabaseSourceCodeRoot(object):
                        `ssh_private_key`=VALUES(`ssh_private_key`);
                 """.format(self.tables_prefix),
                 gamespace_id, application_name, repository_url, repository_branch, ssh_private_key
+            )
+        except DatabaseError as e:
+            raise SourceCodeError(500, e.args[1])
+
+    @coroutine
+    @validate(gamespace_id="int", repository_url="str", repository_branch="str", ssh_private_key="str")
+    def update_default_project(self, gamespace_id, repository_url, repository_branch, ssh_private_key):
+
+        DatabaseSourceCodeRoot.__validate_private_key__(ssh_private_key)
+
+        if not repository_branch:
+            raise ValidationError("'repository_branch' must not be empty")
+
+        try:
+            yield self.db.execute(
+                """
+                INSERT INTO `{0}_default`
+                (`gamespace_id`, `repository_url`, `repository_branch`, `ssh_private_key`)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY 
+                UPDATE `repository_url`=VALUES(`repository_url`), 
+                       `repository_branch`=VALUES(`repository_branch`),
+                       `ssh_private_key`=VALUES(`ssh_private_key`);
+                """.format(self.tables_prefix),
+                gamespace_id, repository_url, repository_branch, ssh_private_key
             )
         except DatabaseError as e:
             raise SourceCodeError(500, e.args[1])
