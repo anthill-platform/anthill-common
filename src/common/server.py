@@ -90,6 +90,9 @@ class Server(tornado.web.Application):
 
         self.debug_mode = options.debug
 
+        if self.debug_mode:
+            handlers.append(('/@memory_map', handler.DebugMemoryHandler))
+
         super(Server, self).__init__(
             handlers=handlers, debug=options.debug
         )

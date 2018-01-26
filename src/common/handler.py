@@ -489,6 +489,18 @@ class LogoutHandler(AuthenticatedHandler):
         self.redirect("/")
 
 
+class DebugMemoryHandler(AuthenticatedHandler):
+    @access.internal
+    def get(self):
+        from pympler import muppy, summary
+
+        all_objects = muppy.get_objects()
+        sum1 = summary.summarize(all_objects)
+
+        for fmt in summary.format_(sum1, limit=50):
+            self.write(fmt + "\n")
+
+
 class RootHandler(AnthillRequestHandler, JsonHandlerMixin):
     def get(self):
         if self.application.debug_mode:
