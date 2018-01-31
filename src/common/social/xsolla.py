@@ -8,6 +8,8 @@ import abc
 import logging
 import socket
 
+from .. import admin as a
+
 import common.social
 
 
@@ -15,9 +17,10 @@ class XsollaAPI(common.social.SocialNetworkAPI):
     __metaclass__ = abc.ABCMeta
 
     XSOLLA_API = "https://api.xsolla.com"
+    NAME = "xsolla"
 
     def __init__(self, cache):
-        super(XsollaAPI, self).__init__("xsolla", cache)
+        super(XsollaAPI, self).__init__(XsollaAPI.NAME, cache)
 
     @coroutine
     def api_get(self, operation, merchant_id, api_key, **kwargs):
@@ -79,6 +82,9 @@ class XsollaAPI(common.social.SocialNetworkAPI):
 
         raise Return(response_object)
 
+    def has_private_key(self):
+        return True
+
     def new_private_key(self, data):
         return XsollaPrivateKey(data)
 
@@ -87,9 +93,44 @@ class XsollaPrivateKey(common.social.SocialPrivateKey):
     def __init__(self, key):
         super(XsollaPrivateKey, self).__init__(key)
 
-        self.api_key = self.data["api_key"]
-        self.project_key = self.data["project_key"]
-        self.merchant_id = self.data["merchant_id"]
+        self.api_key = self.data["api_key"] if self.data else None
+        self.project_key = self.data["project_key"] if self.data else None
+        self.merchant_id = self.data["merchant_id"] if self.data else None
 
     def get_app_id(self):
         return self.merchant_id
+
+    def dump(self):
+        return {
+            "api_key": self.api_key,
+            "project_key": self.project_key,
+            "merchant_id": self.merchant_id,
+        }
+
+    def has_ui(self):
+        return True
+
+    def get(self):
+        return {
+            "api_key": self.api_key,
+            "project_key": self.project_key,
+            "merchant_id": self.merchant_id
+        }
+
+    def render(self):
+        return {
+            "merchant_id": a.field(
+                "Merchant ID", "text", "primary", "non-empty",
+                order=1,),
+            "project_key": a.field(
+                "Project Key", "text", "primary", "non-empty",
+                order=2),
+            "api_key": a.field(
+                "API Key", "text", "primary", "non-empty",
+                order=2)
+        }
+
+    def update(self, merchant_id, project_key, api_key, **ignored):
+        self.merchant_id = merchant_id
+        self.project_key = project_key
+        self.api_key = api_key

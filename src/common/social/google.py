@@ -6,6 +6,8 @@ import ujson
 import jwt
 import abc
 
+from .. import admin as a
+
 import common.social
 
 
@@ -13,9 +15,10 @@ class GoogleAPI(common.social.SocialNetworkAPI):
     __metaclass__ = abc.ABCMeta
 
     GOOGLE_OAUTH = "https://www.googleapis.com/oauth2/"
+    NAME = "google"
 
     def __init__(self, cache):
-        super(GoogleAPI, self).__init__("google", cache)
+        super(GoogleAPI, self).__init__(GoogleAPI.NAME, cache)
 
     def __parse_friend__(self, friend):
         try:
@@ -140,6 +143,9 @@ class GoogleAPI(common.social.SocialNetworkAPI):
             "email": data["email"]
         }
 
+    def has_private_key(self):
+        return True
+
     def new_private_key(self, data):
         return GooglePrivateKey(data)
 
@@ -148,8 +154,43 @@ class GooglePrivateKey(common.social.SocialPrivateKey):
     def __init__(self, key):
         super(GooglePrivateKey, self).__init__(key)
 
-        self.app_secret = self.data["web"]["client_secret"]
-        self.app_id = self.data["web"]["client_id"]
+        self.app_secret = self.data["web"]["client_secret"] if self.data else None
+        self.app_id = self.data["web"]["client_id"] if self.data else None
 
     def get_app_id(self):
         return self.app_id
+
+    def dump(self):
+        return {
+            "web": {
+                "client_secret": self.app_secret,
+                "client_id": self.app_id
+            }
+        }
+
+    def has_ui(self):
+        return True
+
+    def get(self):
+        return {
+            "app_secret": self.app_secret,
+            "app_id": self.app_id
+        }
+
+    def render(self):
+        return {
+            "app_id": a.field(
+                "Client ID", "text", "primary", "non-empty",
+                order=1,
+                description="Client ID from Google's project Credentials, "
+                            "see <a href=\"https://console.developers.google.com/apis/credentials\">Google "
+                            "Credentials</a>"),
+            "app_secret": a.field(
+                "Client Secret", "text", "primary", "non-empty",
+                order=2,
+                description="Same as above, but called \"Client Secret\"")
+        }
+
+    def update(self, app_secret, app_id, **ignored):
+        self.app_secret = app_secret
+        self.app_id = app_id

@@ -5,6 +5,8 @@ import urllib
 import ujson
 import abc
 
+from .. import admin as a
+
 import common.social
 
 
@@ -14,9 +16,10 @@ class VKAPI(common.social.SocialNetworkAPI):
     VK_OAUTH = "https://oauth.vk.com/"
     VK_API = "https://api.vk.com/method/"
     VERSION = "5.68"
+    NAME = "vk"
 
     def __init__(self, cache):
-        super(VKAPI, self).__init__("vk", cache)
+        super(VKAPI, self).__init__(VKAPI.NAME, cache)
 
     def __parse_friend__(self, friend):
         try:
@@ -160,6 +163,9 @@ class VKAPI(common.social.SocialNetworkAPI):
             "avatar": data["photo_200"]
         }
 
+    def has_private_key(self):
+        return True
+
     def new_private_key(self, data):
         return VKPrivateKey(data)
 
@@ -168,8 +174,41 @@ class VKPrivateKey(common.social.SocialPrivateKey):
     def __init__(self, key):
         super(VKPrivateKey, self).__init__(key)
 
-        self.app_secret = self.data["client_secret"]
-        self.app_id = self.data["client_id"]
+        self.app_secret = self.data["client_secret"] if self.data else None
+        self.app_id = self.data["client_id"] if self.data else None
 
     def get_app_id(self):
         return self.app_id
+
+    def dump(self):
+        return {
+            "client_secret": self.app_secret,
+            "client_id": self.app_id
+        }
+
+    def has_ui(self):
+        return True
+
+    def get(self):
+        return {
+            "app_secret": self.app_secret,
+            "app_id": self.app_id
+        }
+
+    def render(self):
+        return {
+            "app_id": a.field(
+                "Application ID", "text", "primary", "non-empty",
+                order=1,
+                description="Select <a href=\"https://vk.com/apps?act=manage\">Manage</a> your VK's application, "
+                            "switch to Settings tab, and copy the \"Application ID.\" field."),
+            "app_secret": a.field(
+                "Secure key", "text", "primary", "non-empty",
+                order=2,
+                description="Select <a href=\"https://vk.com/apps?act=manage\">Manage</a> your VK's application, "
+                            "switch to Settings tab, and copy the \"Secure key.\" field.")
+        }
+
+    def update(self, app_secret, app_id, **ignored):
+        self.app_secret = app_secret
+        self.app_id = app_id

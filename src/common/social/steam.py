@@ -5,6 +5,8 @@ import urllib
 import ujson
 import abc
 
+from .. import admin as a
+
 import common.social
 
 
@@ -12,9 +14,10 @@ class SteamAPI(common.social.SocialNetworkAPI):
     __metaclass__ = abc.ABCMeta
 
     STEAM_API = "https://api.steampowered.com"
+    NAME = "steam"
 
     def __init__(self, cache):
-        super(SteamAPI, self).__init__("steam", cache)
+        super(SteamAPI, self).__init__(SteamAPI.NAME, cache)
 
     @coroutine
     def api_auth(self, gamespace, ticket, app_id):
@@ -151,6 +154,9 @@ class SteamAPI(common.social.SocialNetworkAPI):
             "steam_status": data.get("status", "unknown")
         }
 
+    def has_private_key(self):
+        return True
+
     def new_private_key(self, data):
         return SteamPrivateKey(data)
 
@@ -159,8 +165,40 @@ class SteamPrivateKey(common.social.SocialPrivateKey):
     def __init__(self, key):
         super(SteamPrivateKey, self).__init__(key)
 
-        self.key = self.data["key"]
-        self.app_id = self.data["app_id"]
+        self.key = self.data["key"] if self.data else None
+        self.app_id = self.data["app_id"] if self.data else None
 
     def get_app_id(self):
         return self.app_id
+
+    def dump(self):
+        return {
+            "key": self.key,
+            "app_id": self.app_id
+        }
+
+    def has_ui(self):
+        return True
+
+    def get(self):
+        return {
+            "key": self.key,
+            "app_id": self.app_id
+        }
+
+    def render(self):
+        return {
+            "app_id": a.field(
+                "Steam Game ID", "text", "primary", "non-empty",
+                order=1),
+            "key": a.field(
+                "Encrypted App Ticket Key", "text", "primary", "non-empty",
+                order=2,
+                description="Open <a href=\"https://partner.steamgames.com/apps/\">Steam Apps</a>, select "
+                            "Steamworks Admin, select \"Security\" tab, then copy the \"Encrypted App Ticket Key\" "
+                            "from the SDK Auth page." )
+        }
+
+    def update(self, key, app_id, **ignored):
+        self.key = key
+        self.app_id = app_id

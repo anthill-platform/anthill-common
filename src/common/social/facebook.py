@@ -9,12 +9,16 @@ import ujson
 import hmac
 import hashlib
 
+from .. import admin as a
+
 import common.social
 
 
 class FacebookAPI(common.social.SocialNetworkAPI):
+    NAME = "facebook"
+
     def __init__(self, cache):
-        super(FacebookAPI, self).__init__("facebook", cache)
+        super(FacebookAPI, self).__init__(FacebookAPI.NAME, cache)
 
     def __parse_friend__(self, friend):
         try:
@@ -130,6 +134,9 @@ class FacebookAPI(common.social.SocialNetworkAPI):
             "email": data.get("email", None)
         }
 
+    def has_private_key(self):
+        return True
+
     def new_private_key(self, data=None):
         return FacebookPrivateKey(data)
 
@@ -138,11 +145,41 @@ class FacebookPrivateKey(common.social.SocialPrivateKey):
     def __init__(self, key):
         super(FacebookPrivateKey, self).__init__(key)
 
-        self.app_secret = self.data.get("client_secret", self.data.get("app-secret"))
-        self.app_id = self.data.get("client_id", self.data.get("app-id"))
+        self.app_secret = self.data.get("client_secret", self.data.get("app-secret")) if self.data else None
+        self.app_id = self.data.get("client_id", self.data.get("app-id")) if self.data else None
 
     def get_app_id(self):
         return self.app_id
 
+    def dump(self):
+        return {
+            "client_secret": self.app_secret,
+            "client_id": self.app_id
+        }
 
-# noinspection PyMethodMayBeStatic
+    def has_ui(self):
+        return True
+
+    def get(self):
+        return {
+            "app_secret": self.app_secret,
+            "app_id": self.app_id
+        }
+
+    def render(self):
+        return {
+            "app_id": a.field(
+                "App ID", "text", "primary", "non-empty",
+                order=1,
+                description="Open <a href=\"https://developers.facebook.com/apps/\">Manage Apps</a>, select "
+                            "Settings -> Basic, and copy the App ID."),
+            "app_secret": a.field(
+                "App Secret", "text", "primary", "non-empty",
+                order=2,
+                description="Open <a href=\"https://developers.facebook.com/apps/\">Manage Apps</a>, select "
+                            "Settings -> Basic, and reveal the App Secret.")
+        }
+
+    def update(self, app_secret, app_id, **ignored):
+        self.app_secret = app_secret
+        self.app_id = app_id

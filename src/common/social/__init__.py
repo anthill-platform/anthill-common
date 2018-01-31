@@ -70,6 +70,9 @@ class SocialNetworkAPI(object):
 
         raise Return(self.new_private_key(data))
 
+    def has_private_key(self):
+        return False
+
     def new_private_key(self, data):
         raise NotImplementedError()
 
@@ -81,4 +84,18 @@ class SocialPrivateKey(object):
     def get_app_id(self):
         return None
 
+    def dump(self):
+        return self.data
+
+    def has_ui(self):
+        return False
+
+    def get(self):
+        raise NotImplementedError()
+
+    def render(self):
+        raise NotImplementedError()
+
+    def update(self, **kwargs):
+        raise NotImplementedError()
 
