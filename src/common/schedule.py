@@ -17,8 +17,7 @@ class Schedule(PeriodicCallback):
 
         super(Schedule, self).__init__(
             self.__update__,
-            check_period * 1000,
-            IOLoop.current())
+            check_period * 1000)
 
         self.calls = {}
 
