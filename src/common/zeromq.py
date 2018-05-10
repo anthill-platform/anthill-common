@@ -14,10 +14,11 @@ ioloop.install()
 
 
 class ZMQInterProcess(JsonRPC):
+    context = zmq.Context.instance()
+    context.set(zmq.MAX_SOCKETS, 999999)
+
     def __init__(self, **settings):
         super(ZMQInterProcess, self).__init__()
-
-        self.context = None
         self.socket = None
         self.stream = None
         self.settings = settings
@@ -31,8 +32,6 @@ class ZMQInterProcess(JsonRPC):
         self.stream.on_recv(self.__on_receive__)
 
     def __pre_init__(self):
-        self.context = zmq.Context()
-        self.context.set(zmq.MAX_SOCKETS, 999999)
         self.socket = self.context.socket(zmq.PAIR)
 
     @coroutine
@@ -55,9 +54,6 @@ class ZMQInterProcess(JsonRPC):
             self.stream.close()
         except IOError:
             pass
-
-        self.context.term()
-        self.context = None
 
     @coroutine
     def server(self):
