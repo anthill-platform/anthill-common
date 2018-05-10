@@ -10,6 +10,7 @@ import tornado.netutil
 
 from tornado.gen import coroutine, Return
 from options import options
+from pympler import tracker
 
 import tornado.log
 
@@ -91,7 +92,10 @@ class Server(tornado.web.Application):
         self.debug_mode = options.debug
 
         if self.debug_mode:
-            handlers.append(('/@memory_map', handler.DebugMemoryHandler))
+            self.memory_tracker = tracker.SummaryTracker()
+            handlers.append(('/@memory_diff', handler.DebugMemoryDiffHandler))
+        else:
+            self.memory_tracker = None
 
         super(Server, self).__init__(
             handlers=handlers, debug=options.debug

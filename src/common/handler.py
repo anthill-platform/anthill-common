@@ -1,5 +1,7 @@
 import base64
-import json
+import ujson
+import os
+import psutil
 import logging
 import urllib
 
@@ -13,11 +15,13 @@ from tornado.web import HTTPError, RequestHandler
 from tornado.websocket import WebSocketClosedError, StreamClosedError
 from validate import ValidationError
 
+from pympler import tracker
+
 import access
 import internal
 import jsonrpc
 import ujson
-
+import gc
 
 class JsonHandlerMixin(object):
     # noinspection PyUnresolvedReferences
@@ -65,7 +69,7 @@ class AuthCallbackHandler(AnthillRequestHandler):
         if error:
             error_text = base64.b64decode(error)
             try:
-                error_obj = json.loads(error_text)
+                error_obj = ujson.loads(error_text)
             except ValueError:
                 error_obj = {
                     "result_id": "Internal server error: " + error_text
@@ -489,15 +493,20 @@ class LogoutHandler(AuthenticatedHandler):
         self.redirect("/")
 
 
-class DebugMemoryHandler(AuthenticatedHandler):
+class DebugMemoryDiffHandler(AuthenticatedHandler):
     @access.internal
     def get(self):
-        from pympler import muppy, summary
 
-        all_objects = muppy.get_objects()
-        sum1 = summary.summarize(all_objects)
+        self.set_header("Content-Type", "text/html")
 
-        for fmt in summary.format_(sum1, limit=50):
+        process = psutil.Process(os.getpid())
+        self.write("Used memory: " + str(process.memory_info().rss) + "\n\n")
+
+        gc.collect()
+        
+        diff = self.application.memory_tracker.format_diff()
+
+        for fmt in diff:
             self.write(fmt + "\n")
 
 

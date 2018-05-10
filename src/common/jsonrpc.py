@@ -192,7 +192,9 @@ class JsonRPC(object):
 
     @coroutine
     def release(self):
-        pass
+        self.on_receive = None
+        self.next_id = 0
+        self.handlers = None
 
     @coroutine
     def send_request(self, context, method, timeout=JSONRPC_TIMEOUT, *args, **kwargs):

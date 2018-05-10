@@ -45,6 +45,8 @@ class ZMQInterProcess(JsonRPC):
 
     @coroutine
     def release(self):
+        yield super(ZMQInterProcess, self).release()
+
         path = self.settings["path"]
         logging.info("Closing: " + path)
 
@@ -55,6 +57,7 @@ class ZMQInterProcess(JsonRPC):
             pass
 
         self.context.term()
+        self.context = None
 
     @coroutine
     def server(self):
