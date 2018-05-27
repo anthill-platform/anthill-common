@@ -5,12 +5,10 @@ import tornado.ioloop
 import logging
 import zmq
 import json
-from zmq.eventloop import ioloop, zmqstream
+from zmq.eventloop import zmqstream
 
 from pubsub import Subscriber, Publisher
 from jsonrpc import JsonRPC, JsonRPCError
-
-ioloop.install()
 
 
 class ZMQInterProcess(JsonRPC):
@@ -63,14 +61,13 @@ class ZMQInterProcess(JsonRPC):
         try:
             self.socket.bind("ipc://{0}".format(path))
         except zmq.ZMQError as e:
-            raise JsonRPCError("Failed to listen socket: " + str(e))
+            raise JsonRPCError(500, "Failed to listen socket: " + str(e))
         self.__post_init__()
 
     @coroutine
     def write_data(self, context, data):
-        logging.debug("Sending: " + data)
         try:
-            yield Task(self.stream.send, data)
+            self.stream.send(data)
         except IOError:
             pass
 

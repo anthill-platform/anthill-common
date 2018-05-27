@@ -9,6 +9,12 @@ import datetime
 JSONRPC_TIMEOUT = 10
 
 
+class JsonRPCFuture(Future):
+    def __init__(self, msg_id):
+        super(JsonRPCFuture, self).__init__()
+        self.msg_id = msg_id
+
+
 class JsonRPC(object):
     """
     Asynchronous JSON-RPC protocol implementation. See http://www.jsonrpc.org/specification
@@ -196,13 +202,19 @@ class JsonRPC(object):
         self.next_id = 0
         self.handlers = None
 
+    def __request_future_done__(self, f):
+        if self.handlers is None:
+            return
+        self.handlers.pop(f.msg_id, None)
+
     @coroutine
     def send_request(self, context, method, timeout=JSONRPC_TIMEOUT, *args, **kwargs):
         msg_id = self.__get_next_id__()
         data, params = self.__generate_request__(method, *args, **kwargs)
 
-        future = Future()
+        future = JsonRPCFuture(msg_id)
         self.handlers[msg_id] = future
+        future.add_done_callback(self.__request_future_done__)
 
         # send it out
         yield self.write_object(context, data, id=msg_id)
@@ -211,11 +223,8 @@ class JsonRPC(object):
         try:
             result = yield with_timeout(datetime.timedelta(seconds=timeout), future)
         except TimeoutError:
-            # remove the handler if timed out
-            self.handlers.pop(msg_id, None)
             raise JsonRPCTimeout()
         else:
-
             raise Return(result)
 
     @coroutine
