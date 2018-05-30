@@ -83,6 +83,14 @@ class Model(object):
             if hasattr(self, method_name):
                 yield getattr(self, method_name)()
 
+    # noinspection PyMethodMayBeStatic
+    def has_delete_account_event(self):
+        return False
+
+    @coroutine
+    def accounts_deleted(self, gamespace, accounts, gamespace_only):
+        raise NotImplementedError()
+
     def get_setup_tables(self):
         return []
 
@@ -96,7 +104,7 @@ class Model(object):
         raise NotImplementedError()
 
     @coroutine
-    def started(self):
+    def started(self, application):
         for table in self.get_setup_tables():
             yield self.__setup_table__(table)
 
@@ -106,10 +114,12 @@ class Model(object):
         for trigger in self.get_setup_triggers():
             yield self.__setup_trigger__(trigger)
 
+        logging.info("Model '{0}' started".format(self.__class__.__name__))
+
     @coroutine
     def stopped(self):
         """
         Called when a server is about to shutdown.
         Please not that within 5 second the server will be shut down anyway.
         """
-        pass
+        logging.info("Model '{0}' stopped".format(self.__class__.__name__))

@@ -30,9 +30,10 @@ class Subscriber(object):
 
     @coroutine
     def on_receive(self, channel, payload):
-        if channel in self.handlers:
-            logging.debug("'{0}' received: {1}.".format(channel, ujson.dumps(payload)))
-            yield self.handlers[channel](payload)
+        handlers = self.handlers.get(channel, None)
+        if handlers is not None:
+            for handler in handlers:
+                yield handler(payload)
 
     @coroutine
     def release(self):
@@ -40,10 +41,22 @@ class Subscriber(object):
 
     @coroutine
     def start(self):
-        logging.info("Listening for [{0}].".format(", ".join(self.handlers.keys())))
+        pass
 
+    @coroutine
+    def on_channel_handled(self, channel_name):
+        logging.info("Listening for channel '{0}'.".format(channel_name))
+
+    @coroutine
     def handle(self, channel, handler):
-        self.handlers[channel] = handler
+        existing_handlers = self.handlers.get(channel, None)
+
+        if existing_handlers is not None:
+            existing_handlers.append(handler)
+            return
+
+        self.handlers[channel] = [handler]
+        yield self.on_channel_handled(channel)
 
 
 EXCHANGE_PREFIX = "pub."
@@ -52,10 +65,9 @@ QUEUE_PREFIX = "sub."
 
 class RabbitMQSubscriber(Subscriber):
 
-    def __init__(self, channels, broker, name=None, **settings):
+    def __init__(self, broker, name=None, **settings):
         super(RabbitMQSubscriber, self).__init__()
 
-        self.channels = channels
         self.broker = broker
 
         self.settings = settings
@@ -63,6 +75,7 @@ class RabbitMQSubscriber(Subscriber):
         self.queue = None
         self.consumer = None
         self.name = name or "*"
+        self.channel = None
 
     @coroutine
     def __on_message__(self, channel, method, properties, body):
@@ -90,23 +103,25 @@ class RabbitMQSubscriber(Subscriber):
         yield self.connection.close()
 
     @coroutine
+    def on_channel_handled(self, channel_name):
+        yield self.channel.exchange(
+            exchange=EXCHANGE_PREFIX + channel_name,
+            exchange_type='fanout')
+
+        yield self.queue.bind(exchange=EXCHANGE_PREFIX + channel_name)
+        yield super(RabbitMQSubscriber, self).on_channel_handled(channel_name)
+
+    @coroutine
     def start(self):
 
         self.connection = rabbitconn.RabbitMQConnection(
             self.broker,
-            connection_name="pubsub." + self.name,
+            connection_name="sub." + self.name,
             **self.settings)
         yield self.connection.wait_connect()
 
-        channel = yield self.connection.channel(prefetch_count=self.settings.get("channel_prefetch_count", 1024))
-        self.queue = yield channel.queue(queue=QUEUE_PREFIX + self.name, auto_delete=True)
-
-        for channel_name in self.channels:
-            yield channel.exchange(
-                exchange=EXCHANGE_PREFIX + channel_name,
-                exchange_type='fanout')
-
-            yield self.queue.bind(exchange=EXCHANGE_PREFIX + channel_name)
+        self.channel = yield self.connection.channel(prefetch_count=self.settings.get("channel_prefetch_count", 1024))
+        self.queue = yield self.channel.queue(queue=QUEUE_PREFIX + self.name, auto_delete=True)
 
         self.consumer = yield self.queue.consume(
             consumer_callback=self.__on_message__,
@@ -116,10 +131,9 @@ class RabbitMQSubscriber(Subscriber):
 
 
 class RabbitMQPublisher(Publisher):
-    def __init__(self, channels, broker, name, **settings):
+    def __init__(self, broker, name, **settings):
         super(RabbitMQPublisher, self).__init__()
 
-        self.channels = channels
         self.broker = broker
         self.settings = settings
         self.connection = None
@@ -148,17 +162,8 @@ class RabbitMQPublisher(Publisher):
         # connect
         self.connection = rabbitconn.RabbitMQConnection(
             self.broker,
-            connection_name="pubsub." + str(self.name),
+            connection_name="pub." + str(self.name),
             **self.settings)
 
         yield self.connection.wait_connect()
-
         self.channel = yield self.connection.channel()
-
-        for channel_name in self.channels:
-
-            exchange = yield self.channel.exchange(
-                exchange=EXCHANGE_PREFIX + channel_name,
-                exchange_type='fanout')
-
-            self.exchanges[channel_name] = exchange

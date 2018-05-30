@@ -18,12 +18,15 @@ import internal
 import access
 import discover
 import admin
+import pubsub
 import jsonrpc
 import monitoring
 import handler
 import traceback
 import time
 import signal
+import threading
+import validate
 
 # just included to define things
 import options.default as opts_
@@ -45,11 +48,17 @@ class ServerError(RuntimeError):
 
 
 class Server(tornado.web.Application):
+    _instance = None
+
     def __init__(self):
 
-        self.http_server = None
+        Server._instance = self
 
+        self.has_started = False
+        self.started_callback = None
+        self.http_server = None
         self.api_version = options.api_version
+        self.listen_port = 0
 
         handlers = self.get_handlers() or []
 
@@ -121,7 +130,21 @@ class Server(tornado.web.Application):
         self.internal = None
         self.shutting_down = False
 
+        # pub/sub
+        self.subscriber = None
+        self.publisher = None
+
         tornado.ioloop.IOLoop.instance().set_blocking_log_threshold(0.5)
+
+    @classmethod
+    def instance(cls):
+        return cls._instance
+
+    def set_started_callback(self, callback):
+        if self.has_started:
+            callback()
+        else:
+            self.started_callback = callback
 
     def monitor_action(self, action_name, values, **tags):
         """
@@ -288,11 +311,37 @@ class Server(tornado.web.Application):
         return True
 
     @coroutine
+    def acquire_subscriber(self):
+        if self.subscriber is not None:
+            raise Return(self.subscriber)
+
+        self.subscriber = pubsub.RabbitMQSubscriber(
+            name=options.name,
+            broker=options.pubsub,
+            channel_prefetch_count=options.internal_channel_prefetch_count)
+
+        yield self.subscriber.start()
+        raise Return(self.subscriber)
+
+    @coroutine
+    def acquire_publisher(self):
+        if self.publisher is not None:
+            raise Return(self.publisher)
+
+        self.publisher = pubsub.RabbitMQPublisher(
+            broker=options.pubsub,
+            name=options.name,
+            channel_prefetch_count=options.internal_channel_prefetch_count)
+
+        yield self.publisher.start()
+        raise Return(self.publisher)
+
+    @coroutine
     def started(self):
         self.name = options.name
 
         if self.token_cache_enabled():
-            self.token_cache.load()
+            yield self.token_cache.load(self)
 
         self.init_discovery()
         self.internal = internal.Internal()
@@ -300,17 +349,53 @@ class Server(tornado.web.Application):
         if self.internal_handler:
             yield self.internal.listen(self.name, self.__on_internal_receive__)
 
+        need_account_delete_event = False
+
         for model in self.get_models():
             if hasattr(model, "started"):
-                yield model.started()
+                yield model.started(self)
+            if model.has_delete_account_event():
+                need_account_delete_event = True
+
+        if need_account_delete_event:
+            subscriber = yield self.acquire_subscriber()
+            yield subscriber.handle("DEL", self.__account_deleted_callback__)
+
+        if self.subscriber:
+            yield self.subscriber.start()
 
         logging.info("Service '%s' started.", self.name)
 
-    def run(self):
-        signal.signal(signal.SIGPIPE, Server.__sigpipe_handler__)
-        signal.signal(signal.SIGTERM, self.__sig_handler__)
-        signal.signal(signal.SIGINT, self.__sig_handler__)
+        self.has_started = True
+        if self.started_callback:
+            self.started_callback()
+            self.started_callback = None
 
+    @coroutine
+    def __account_deleted_callback__(self, data):
+        try:
+            accounts = validate.validate_value(data["accounts"], "json_list_of_ints")
+            gamespace_id = data["gamespace"]
+            gamespace_only = data["gamespace_only"]
+        except KeyError:
+            return
+        except validate.ValidationError:
+            return
+
+        if not accounts:
+            return
+
+        for model in self.get_models():
+            if model.has_delete_account_event():
+                # noinspection PyBroadException
+                try:
+                    yield model.accounts_deleted(gamespace_id, accounts, gamespace_only)
+                except Exception:
+                    logging.exception("Failed to notify 'accounts_deleted' on '{0}'".format(model.__class__.__name__))
+                else:
+                    logging.info("Deleted {0} accounts on '{1}'".format(len(accounts), model.__class__.__name__))
+
+    def listen_server(self):
         self.http_server = tornado.httpserver.HTTPServer(self, xheaders=True)
 
         listen_uri = options.listen
@@ -324,6 +409,7 @@ class Server(tornado.web.Application):
         def listen_port(ports):
             for port in ports:
                 self.http_server.listen(int(port), "127.0.0.1")
+                self.listen_port = port
 
         def listen_unix(sockets):
             for sock in sockets:
@@ -342,8 +428,18 @@ class Server(tornado.web.Application):
         listen_method = kinds[kind]
         listen_method(addresses)
 
-        logging.info("API version is '{0}'".format(self.api_version))
         logging.info("Listening '{0}' on '{1}'".format(kind, addresses))
+
+    def run(self):
+        # noinspection PyUnresolvedReferences,PyProtectedMember
+        if isinstance(threading.current_thread(), threading._MainThread):
+            signal.signal(signal.SIGPIPE, Server.__sigpipe_handler__)
+            signal.signal(signal.SIGTERM, self.__sig_handler__)
+            signal.signal(signal.SIGINT, self.__sig_handler__)
+
+        self.listen_server()
+
+        logging.info("API version is '{0}'".format(self.api_version))
         logging.info("Host is '{0}'".format(self.get_host()))
 
         tornado.ioloop.IOLoop.instance().add_callback(self.started)
@@ -391,6 +487,18 @@ class Server(tornado.web.Application):
     def __sigpipe_handler__(sig, frame):
         logging.warning('Caught SIGPIPE')
 
+    @coroutine
+    def process_shutdown(self):
+        if self.subscriber:
+            yield self.subscriber.release()
+
+        for model in self.get_models():
+            if hasattr(model, "stopped"):
+                yield model.stopped()
+
+        if self.publisher:
+            yield self.publisher.release()
+
     def shutdown(self):
         self.shutting_down = True
 
@@ -400,17 +508,11 @@ class Server(tornado.web.Application):
 
         io_loop = tornado.ioloop.IOLoop.instance()
 
-        @coroutine
-        def process_shutdown():
-            for model in self.get_models():
-                if hasattr(model, "stopped"):
-                    yield model.stopped()
-
         def shutdown_callback(f):
             io_loop.stop()
             logging.info('Stopped!')
 
-        io_loop.add_future(process_shutdown(), shutdown_callback)
+        io_loop.add_future(self.process_shutdown(), shutdown_callback)
 
 
 def init():

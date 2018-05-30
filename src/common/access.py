@@ -203,10 +203,7 @@ class AccessTokenCache(object):
     @coroutine
     def __invalidate_uuid__(self, db, account, uuid):
 
-        removed = yield Task(
-            db.delete,
-            "id:" + uuid)
-
+        removed = yield Task(db.delete, "id:" + str(uuid))
         if removed > 0:
             logging.info("Invalidated token '{0}' for account '{1}'".format(uuid, account))
 
@@ -215,38 +212,25 @@ class AccessTokenCache(object):
 
     @coroutine
     def get(self, account):
-
         db = self.kv.acquire()
         try:
-
-            result = yield Task(
-                db.get,
-                account)
+            result = yield Task(db.get, account)
         finally:
             yield db.release()
-
         raise Return(result)
 
     @coroutine
-    def load(self):
-
-        self.subscriber = pubsub.RabbitMQSubscriber(
-            channels=[INVALIDATION_CHANNEL],
-            name=options.name,
-            broker=options.pubsub,
-            channel_prefetch_count=options.internal_channel_prefetch_count)
-
+    def load(self, application):
+        self.subscriber = yield application.acquire_subscriber()
         self.kv = keyvalue.KeyValueStorage(
             host=options.token_cache_host,
             port=options.token_cache_port,
             db=options.token_cache_db,
             max_connections=options.token_cache_max_connections)
-
         yield self.subscribe()
 
     @coroutine
     def on_invalidate(self, data):
-
         try:
             account = data["account"]
             uuid = data["uuid"]
@@ -256,16 +240,9 @@ class AccessTokenCache(object):
 
         db = self.kv.acquire()
         try:
-            yield self.__invalidate_uuid__(
-                db,
-                account,
-                uuid)
+            yield self.__invalidate_uuid__(db, account, uuid)
         finally:
             yield db.release()
-
-    @coroutine
-    def release(self):
-        yield self.subscriber.release()
 
     @coroutine
     def store(self, db, account, uuid, expire):
@@ -273,24 +250,25 @@ class AccessTokenCache(object):
 
     @coroutine
     def store_token(self, db, token):
-        yield self.store(
-            db,
-            token.account,
-            token.uuid,
-            token.expiration_date)
+        gamespace = token.get(AccessToken.GAMESPACE)
+        if gamespace is None:
+            return
+        yield self.store(db, gamespace, token.account, token.uuid, token.expiration_date)
+
+    @coroutine
+    def store_token_no_db(self, token):
+        db = self.kv.acquire()
+        try:
+            yield self.store_token(db, token)
+        finally:
+            yield db.release()
 
     @coroutine
     def subscribe(self):
-
-        self.subscriber.handle(
-            INVALIDATION_CHANNEL,
-            self.on_invalidate)
-
-        yield self.subscriber.start()
+        yield self.subscriber.handle(INVALIDATION_CHANNEL, self.on_invalidate)
 
     @coroutine
     def validate(self, token, db=None):
-
         if not isinstance(token, AccessToken):
             raise AttributeError("Argument 'token' is not an AccessToken")
 
@@ -298,17 +276,12 @@ class AccessTokenCache(object):
             raise Return(False)
 
         if db:
-            result = yield self.validate_db(
-                token,
-                db=db)
-
+            result = yield self.validate_db(token, db=db)
             raise Return(result)
 
         db = self.kv.acquire()
         try:
-            result = yield self.validate_db(
-                token,
-                db=db)
+            result = yield self.validate_db(token, db=db)
         finally:
             yield db.release()
 
@@ -333,31 +306,16 @@ class AccessTokenCache(object):
             raise Return(True)
 
         try:
-            yield self.internal.request(
-                issuer,
-                "validate_token",
-                access_token=token.key)
-
+            yield self.internal.request(issuer, "validate_token", access_token=token.key)
         except InternalError:
-            yield Task(
-                db.setex,
-                "inv:" + uuid,
-                INVALID_TTL,
-                "")
-
+            yield Task(db.setex, "inv:" + uuid, INVALID_TTL, "")
             raise Return(False)
         else:
             expiration_date = int(token.get(AccessToken.EXPIRATION_DATE))
             now = int(utc_time())
             left = expiration_date - now
-
             if left > 0:
-                yield self.store(
-                    db,
-                    account,
-                    uuid,
-                    left)
-
+                yield self.store(db, account, uuid, left)
                 raise Return(True)
 
 
