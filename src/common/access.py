@@ -250,10 +250,7 @@ class AccessTokenCache(object):
 
     @coroutine
     def store_token(self, db, token):
-        gamespace = token.get(AccessToken.GAMESPACE)
-        if gamespace is None:
-            return
-        yield self.store(db, gamespace, token.account, token.uuid, token.expiration_date)
+        yield self.store(db, token.account, token.uuid, token.expiration_date)
 
     @coroutine
     def store_token_no_db(self, token):
