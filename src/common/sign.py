@@ -3,6 +3,7 @@ import abc
 
 
 TOKEN_SIGNATURE_RSA = 'RS256'
+TOKEN_SIGNATURE_HMAC = 'HS256'
 
 
 class AccessTokenSignature(object):
@@ -48,3 +49,21 @@ class RSAAccessTokenSignature(AccessTokenSignature):
 
     def validate_key(self):
         return self.public
+
+
+class HMACAccessTokenSignature(AccessTokenSignature):
+    def __init__(self, key=None):
+        AccessTokenSignature.__init__(self)
+        self.key = key
+
+    def id(self):
+        return TOKEN_SIGNATURE_HMAC
+
+    def sign_key(self):
+        return self.key
+
+    def sign_password(self):
+        return None
+
+    def validate_key(self):
+        return self.key

@@ -58,7 +58,6 @@ class Server(tornado.web.Application):
         self.started_callback = None
         self.http_server = None
         self.api_version = options.api_version
-        self.listen_port = 0
 
         handlers = self.get_handlers() or []
 
@@ -134,7 +133,7 @@ class Server(tornado.web.Application):
         self.subscriber = None
         self.publisher = None
 
-        tornado.ioloop.IOLoop.instance().set_blocking_log_threshold(0.5)
+        tornado.ioloop.IOLoop.current().set_blocking_log_threshold(0.5)
 
     @classmethod
     def instance(cls):
@@ -260,39 +259,6 @@ class Server(tornado.web.Application):
         """
         return None
 
-    @coroutine
-    def get_gamespace(self, gamespace_name):
-        """
-        :returns a gamespace ID from given name.
-        """
-        internal_ = internal.Internal()
-
-        @retry(operation="Acquiring gamespace", max=5, delay=5)
-        @coroutine
-        def do_try():
-            response = yield internal_.request(
-                "login",
-                "get_gamespace",
-                name=gamespace_name)
-            raise Return(str(response["id"]))
-
-        raise Return((yield do_try()))
-
-    @coroutine
-    def get_gamespace_list(self):
-        """
-        :returns: a list of available gamespaces across the environment.
-        """
-        internal_ = internal.Internal()
-
-        @retry(operation="Acquiring gamespace list", max=5, delay=5)
-        @coroutine
-        def do_try():
-            response = yield internal_.request("login", "get_gamespaces")
-            raise Return(response)
-
-        raise Return((yield do_try()))
-
     def init_discovery(self):
         discover.init()
 
@@ -409,7 +375,6 @@ class Server(tornado.web.Application):
         def listen_port(ports):
             for port in ports:
                 self.http_server.listen(int(port), "127.0.0.1")
-                self.listen_port = port
 
         def listen_unix(sockets):
             for sock in sockets:
@@ -489,6 +454,8 @@ class Server(tornado.web.Application):
 
     @coroutine
     def process_shutdown(self):
+        yield self.internal.stop()
+
         if self.subscriber:
             yield self.subscriber.release()
 

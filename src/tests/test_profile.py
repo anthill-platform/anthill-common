@@ -248,3 +248,27 @@ class TestProfile(AsyncTestCase):
             {"a": ["test1", "test2", "test3"]},
             {"a": {"@func": "array_append", "@value": 5, "@limit": 3, "@shift": True}},
             {"a": ["test2", "test3", 5]})
+
+    @gen_test
+    def test_object(self):
+        yield self.check_profile_success(
+            {"root": {
+                "a": 5
+            }},
+            {"root": {
+                "a": {"@func": "++", "@value": 4}
+            }},
+            {"root": {
+                "a": 9
+            }})
+
+    @gen_test
+    def test_object_empty(self):
+        yield self.check_profile_success(
+            {},
+            {"root": {
+                "a": {"@func": "++", "@value": 4}
+            }},
+            {"root": {
+                "a": 4
+            }})

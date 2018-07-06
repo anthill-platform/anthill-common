@@ -64,6 +64,10 @@ class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
 
         raise Return(context)
 
+    @coroutine
+    def stop(self):
+        yield self.close()
+
     def __init__(self, mq, broker, connection_name=None, channel_prefetch_count=0, **kwargs):
         super(JsonAMQPConnection, self).__init__(broker, connection_name, channel_prefetch_count, **kwargs)
         self.named_channels = {}
@@ -188,6 +192,10 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
             no_ack=True)
 
         self.set_receive(on_receive)
+
+    @coroutine
+    def stop(self):
+        yield self.listen_connection.stop()
 
     @coroutine
     def write_object(self, context, data, **payload):
