@@ -1,10 +1,8 @@
 language: python
 python:
   - "2.7"
-virtualenv:
-    system_site_package: true
 env:
-  - PYTHONPATH=src
+  - PYTHONPATH=$PYTHONPATH:src
 addons:
   apt:
     sources:
