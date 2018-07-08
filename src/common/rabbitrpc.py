@@ -66,7 +66,15 @@ class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
 
     @coroutine
     def stop(self):
-        yield self.close()
+        self.close()
+
+        closed_future = Future()
+
+        def closed(*args, **kwargs):
+            closed_future.set_result(True)
+        yield self.add_on_close_callback(closed)
+        yield closed_future
+        pass
 
     def __init__(self, mq, broker, connection_name=None, channel_prefetch_count=0, **kwargs):
         super(JsonAMQPConnection, self).__init__(broker, connection_name, channel_prefetch_count, **kwargs)

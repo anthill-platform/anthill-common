@@ -1,4 +1,4 @@
-from tornado.gen import coroutine, Return
+from tornado.gen import coroutine, Return, sleep
 from tornado.testing import AsyncTestCase, bind_unused_port, get_async_test_timeout
 from tornado.httpserver import HTTPServer
 from tornado.httpclient import AsyncHTTPClient, HTTPError, HTTPRequest
@@ -29,19 +29,63 @@ class TestError(Exception):
 
 
 class ServerTestCase(AsyncTestCase):
+    """
+    Use this test case for testing models of a service without actually testing external REST api.
+
+    Override get_server_instance to return common.Server instance, any test will be performed on that instance,
+    available on self.application
+
+    If you need to test external REST api, use AcceptanceTestCase instead
+    """
+
+    @classmethod
+    def need_test_db(cls):
+        """
+        Return True if you need a test database (will be available as self.test_db)
+        """
+        return False
+
+    @classmethod
+    def get_server_instance(cls, db=None):
+        """
+        Override this method to return common.Server instance
+        :param db: if need_test_db() returns True, this argument will contain a Database reference
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    @coroutine
+    def co_setup_server_tests(cls):
+        """
+        Coroutine-friendly analog of the setUpClass method, override this one to setup things before any test
+        """
+        pass
 
     def get_new_ioloop(self):
-        return IOLoop.instance()
+        return IOLoop.current()
+
+    def tearDown(self):
+        pass
 
     @classmethod
     @coroutine
     def co_setup_class(cls):
-        pass
+        if cls.need_test_db():
+            cls.test_db = yield ServerTestCase.get_test_db()
+        else:
+            cls.test_db = None
+
+        cls.application = cls.get_server_instance(cls.test_db)
+
+        IOLoop.current().set_blocking_log_threshold(0)
+
+        yield cls.application.started()
 
     @classmethod
     @coroutine
     def co_tear_down_class(cls):
-        pass
+        # noinspection PyUnresolvedReferences
+        yield cls.application.process_shutdown()
 
     @classmethod
     def setUpClass(cls):
@@ -108,6 +152,15 @@ class TestWebsocketJsonRPC(JsonRPC):
 
 
 class AcceptanceTestCase(AsyncTestCase):
+    """
+    Use this test case for testing external REST api of a service.
+
+    Override get_server_instance to return common.Server instance, any test will be performed on that instance,
+    available on self.application
+
+    Do not test models in that test case, use ServerTestCase instead
+    """
+
     TESTING_KEY = "m233TJDKgFdW8HbSwFh3B5DgatTMZDgH"
     TOKEN_GAMESPACE = "1"
     TOKEN_GAMESPACE_NAME = "root"
@@ -168,6 +221,7 @@ class AcceptanceTestCase(AsyncTestCase):
 
     @classmethod
     def get_http_server(cls):
+        # noinspection PyUnresolvedReferences
         return HTTPServer(cls.application, **cls.get_httpserver_options())
 
     @classmethod
@@ -179,11 +233,11 @@ class AcceptanceTestCase(AsyncTestCase):
         cls.http_client = cls.get_http_client()
 
         if cls.need_test_db():
-            test_db = yield cls.__get_test_db__()
+            cls.test_db = yield ServerTestCase.get_test_db()
         else:
-            test_db = None
+            cls.test_db = None
 
-        cls.application = cls.get_server_instance(test_db)
+        cls.application = cls.get_server_instance(cls.test_db)
 
         cls.http_server = cls.get_http_server()
         cls.http_server.add_sockets([sock])
@@ -227,18 +281,19 @@ class AcceptanceTestCase(AsyncTestCase):
     @classmethod
     @coroutine
     def co_tear_down_class(cls):
-        pass
+        # noinspection PyUnresolvedReferences
+        yield cls.application.process_shutdown()
 
     # noinspection PyUnresolvedReferences
     @classmethod
     def tearDownClass(cls):
         super(AcceptanceTestCase, cls).tearDownClass()
 
+        IOLoop.current().run_sync(cls.co_tear_down_class)
+
         cls.http_server.stop()
         IOLoop.current().run_sync(cls.http_server.close_all_connections, timeout=get_async_test_timeout())
         cls.http_client.close()
-
-        IOLoop.current().run_sync(cls.co_tear_down_class)
 
     # noinspection PyUnresolvedReferences
     @classmethod
@@ -253,7 +308,9 @@ class AcceptanceTestCase(AsyncTestCase):
             access.AccessToken.GAMESPACE: str(gamespace_id)
         }, token_only=True)
 
+        # noinspection PyUnresolvedReferences
         if hasattr(cls.application, "token_cache"):
+            # noinspection PyUnresolvedReferences
             token_cache = cls.application.token_cache
             token_cache.store_token_no_db(access.AccessToken(token))
 
@@ -262,6 +319,7 @@ class AcceptanceTestCase(AsyncTestCase):
     @classmethod
     @coroutine
     def admin_action(cls, action_name, method_name, context, *args, **kwargs):
+        # noinspection PyUnresolvedReferences
         action_class = cls.application.actions.action(action_name)
         if action_class is None:
             raise AssertionError("No such admin action: {0}".format(action_name))
@@ -271,6 +329,7 @@ class AcceptanceTestCase(AsyncTestCase):
             access.AccessToken.GAMESPACE: str(AcceptanceTestCase.TOKEN_GAMESPACE)
         }, token_only=True))
 
+        # noinspection PyUnresolvedReferences
         action = action_class(cls.application, token)
         action.context = context
 
@@ -421,43 +480,3 @@ class AcceptanceTestCase(AsyncTestCase):
             self.fail("Request /{0} is expected to fail with {1} {2}, succseeded instead".format(
                 path, expected_code, expected_body
             ))
-
-    @classmethod
-    @coroutine
-    def __get_test_db__(cls, db_host=TEST_DB_HOST, db_name=TEST_DATABASE,
-                        db_username=TEST_DB_USERNAME, db_password=TEST_DB_PASSWORD):
-
-        database = Database(
-            host=db_host,
-            user=db_username,
-            password=db_password
-        )
-
-        try:
-            with (yield database.acquire()) as db:
-                yield db.execute(
-                    """
-                        DROP DATABASE IF EXISTS `{0}`;
-                    """.format(db_name))
-
-                yield db.execute(
-                    """
-                        CREATE DATABASE IF NOT EXISTS `{0}` CHARACTER SET utf8;
-                    """.format(db_name))
-
-                yield db.execute(
-                    """
-                        USE `{0}`;
-                    """.format(db_name))
-
-                db.conn._kwargs["db"] = TEST_DATABASE
-
-        except DatabaseError as e:
-            raise TestError("Failed to initialize database. Please make sure "
-                            "you've configured access to a test database. Reason: " + e.args[1])
-
-        # since we have the database now, use this dirty hack to set up a database
-        # for each new connection in the connection pool
-        database.pool._kwargs["db"] = TEST_DATABASE
-
-        raise Return(database)

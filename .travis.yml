@@ -1,0 +1,25 @@
+language: python
+python:
+  - "2.7"
+virtualenv:
+    system_site_package: true
+env:
+  - PYTHONPATH=src
+addons:
+  apt:
+    sources:
+      - mysql-5.7-trusty
+    packages:
+      - mysql-server
+dist: trusty
+sudo: required
+before_install:
+  - mysql -e 'CREATE DATABASE IF NOT EXISTS test;'
+services:
+  - mysql
+  - redis-server
+  - rabbitmq
+install:
+  - pip install -r src/requirements.txt
+script:
+  - python -m unittest discover
