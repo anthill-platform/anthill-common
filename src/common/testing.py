@@ -15,13 +15,11 @@ from environment import EnvironmentClient, ApplicationInfoAdapter
 from login import LoginClient, GamespaceAdapter
 from jsonrpc import JsonRPC
 from gen import AccessTokenGenerator
+from options import options
 
 import urllib
 
-TEST_DATABASE = "test"
-TEST_DB_HOST = "localhost"
-TEST_DB_USERNAME = "test"
-TEST_DB_PASSWORD = ""
+TEST_DATABASE_NAME = "test"
 
 
 class TestError(Exception):
@@ -97,13 +95,13 @@ class ServerTestCase(AsyncTestCase):
 
     @classmethod
     @coroutine
-    def get_test_db(cls, db_host=TEST_DB_HOST, db_name=TEST_DATABASE,
-                    db_username=TEST_DB_USERNAME, db_password=TEST_DB_PASSWORD):
+    def get_test_db(cls):
 
         database = Database(
-            host=db_host,
-            user=db_username,
-            password=db_password
+            host=options.db_host,
+            database=TEST_DATABASE_NAME,
+            user=options.db_username,
+            password=options.db_password
         )
 
         try:
@@ -111,19 +109,19 @@ class ServerTestCase(AsyncTestCase):
                 yield db.execute(
                     """
                         DROP DATABASE IF EXISTS `{0}`;
-                    """.format(db_name))
+                    """.format(TEST_DATABASE_NAME))
 
                 yield db.execute(
                     """
                         CREATE DATABASE IF NOT EXISTS `{0}` CHARACTER SET utf8;
-                    """.format(db_name))
+                    """.format(TEST_DATABASE_NAME))
 
                 yield db.execute(
                     """
                         USE `{0}`;
-                    """.format(db_name))
+                    """.format(TEST_DATABASE_NAME))
 
-                db.conn._kwargs["db"] = TEST_DATABASE
+                db.conn._kwargs["db"] = TEST_DATABASE_NAME
 
         except DatabaseError as e:
             raise TestError("Failed to initialize database. Please make sure "
@@ -131,7 +129,7 @@ class ServerTestCase(AsyncTestCase):
 
         # since we have the database now, use this dirty hack to set up a database
         # for each new connection in the connection pool
-        database.pool._kwargs["db"] = TEST_DATABASE
+        database.pool._kwargs["db"] = TEST_DATABASE_NAME
 
         raise Return(database)
 
