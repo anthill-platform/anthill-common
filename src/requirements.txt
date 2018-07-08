@@ -20,6 +20,7 @@ python-geoip-geolite2-yplan==2017.608
 psutil==5.2.2
 lazy==1.3
 pympler==0.5
+sprockets-influxdb==2.1.0
 
 git+https://github.com/anthill-utils/tornado-redis.git#egg=tornado-redis
 git+https://github.com/anthill-utils/PyMySQL.git#egg=PyMySQL
