@@ -11,10 +11,10 @@ import hashlib
 
 from .. import admin as a
 
-import common.social
+from common.social import SocialNetworkAPI, APIError, AuthResponse, SocialPrivateKey
 
 
-class FacebookAPI(common.social.SocialNetworkAPI):
+class FacebookAPI(SocialNetworkAPI):
     NAME = "facebook"
 
     def __init__(self, cache):
@@ -42,20 +42,20 @@ class FacebookAPI(common.social.SocialNetworkAPI):
                 "code": code
             })
         except tornado.httpclient.HTTPError as e:
-            raise common.social.APIError(e.code, e.response.body if e.response else "")
+            raise APIError(e.code, e.response.body if e.response else "")
         else:
             try:
                 data = ujson.loads(response.body)
             except (KeyError, ValueError):
-                raise common.social.APIError(400, "corrupted_facebook_response")
+                raise APIError(400, "corrupted_facebook_response")
 
             try:
                 access_token = data["access_token"]
                 expires_in = data["expires_in"]
             except KeyError:
-                raise common.social.APIError(400, "corrupted_facebook_response")
+                raise APIError(400, "corrupted_facebook_response")
 
-            result = common.social.AuthResponse(access_token=access_token, expires_in=expires_in, import_social=True)
+            result = AuthResponse(access_token=access_token, expires_in=expires_in, import_social=True)
             raise Return(result)
 
     @coroutine
@@ -70,7 +70,7 @@ class FacebookAPI(common.social.SocialNetworkAPI):
                 private_key=private_key, access_token=access_token)
 
         except tornado.httpclient.HTTPError as e:
-            raise common.social.APIError(e.code, e.response.body)
+            raise APIError(e.code, e.response.body)
         else:
             data = ujson.loads(response.body)
 
@@ -93,7 +93,7 @@ class FacebookAPI(common.social.SocialNetworkAPI):
                 "fields": fields
             }, private_key=private_key, access_token=access_token)
         except tornado.httpclient.HTTPError as e:
-            raise common.social.APIError(e.code, e.response.body)
+            raise APIError(e.code, e.response.body)
         else:
 
             data = ujson.loads(response.body)
@@ -141,7 +141,7 @@ class FacebookAPI(common.social.SocialNetworkAPI):
         return FacebookPrivateKey(data)
 
 
-class FacebookPrivateKey(common.social.SocialPrivateKey):
+class FacebookPrivateKey(SocialPrivateKey):
     def __init__(self, key):
         super(FacebookPrivateKey, self).__init__(key)
 

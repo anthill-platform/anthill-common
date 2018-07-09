@@ -10,10 +10,10 @@ import socket
 
 from .. import admin as a
 
-import common.social
+from common.social import SocialNetworkAPI, APIError, AuthResponse, SocialPrivateKey
 
 
-class XsollaAPI(common.social.SocialNetworkAPI):
+class XsollaAPI(SocialNetworkAPI):
     __metaclass__ = abc.ABCMeta
 
     XSOLLA_API = "https://api.xsolla.com"
@@ -42,7 +42,7 @@ class XsollaAPI(common.social.SocialNetworkAPI):
         try:
             response_object = ujson.loads(result.body)
         except (KeyError, ValueError):
-            raise common.social.APIError(500, "Corrupted xsolla response")
+            raise APIError(500, "Corrupted xsolla response")
 
         raise Return(response_object)
 
@@ -64,21 +64,21 @@ class XsollaAPI(common.social.SocialNetworkAPI):
         try:
             result = yield self.client.fetch(request)
         except socket.error as e:
-            raise common.social.APIError(500, "Connection error: " + e.message)
+            raise APIError(500, "Connection error: " + e.message)
         except HTTPError as e:
             try:
                 parsed = ujson.loads(e.response.body)
             except (KeyError, ValueError):
-                raise common.social.APIError(e.code, "Internal API error")
+                raise APIError(e.code, "Internal API error")
             else:
                 code = parsed.get("http_status_code", e.code)
                 message = parsed.get("message", "Internal API error")
-                raise common.social.APIError(code, message)
+                raise APIError(code, message)
 
         try:
             response_object = ujson.loads(result.body)
         except (KeyError, ValueError):
-            raise common.social.APIError(500, "Corrupted xsolla response")
+            raise APIError(500, "Corrupted xsolla response")
 
         raise Return(response_object)
 
@@ -89,7 +89,7 @@ class XsollaAPI(common.social.SocialNetworkAPI):
         return XsollaPrivateKey(data)
 
 
-class XsollaPrivateKey(common.social.SocialPrivateKey):
+class XsollaPrivateKey(SocialPrivateKey):
     def __init__(self, key):
         super(XsollaPrivateKey, self).__init__(key)
 

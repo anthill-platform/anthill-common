@@ -8,10 +8,10 @@ import abc
 
 from .. import admin as a
 
-import common.social
+from common.social import SocialNetworkAPI, APIError, AuthResponse, SocialPrivateKey
 
 
-class MailRuAPI(common.social.SocialNetworkAPI):
+class MailRuAPI(SocialNetworkAPI):
     __metaclass__ = abc.ABCMeta
 
     NAME = "mailru"
@@ -38,7 +38,7 @@ class MailRuAPI(common.social.SocialNetworkAPI):
         return MailRuPrivateKey(data)
 
 
-class MailRuPrivateKey(common.social.SocialPrivateKey):
+class MailRuPrivateKey(SocialPrivateKey):
     def __init__(self, key):
         super(MailRuPrivateKey, self).__init__(key)
 
