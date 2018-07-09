@@ -5,11 +5,12 @@ from tornado.httpclient import AsyncHTTPClient, HTTPError, HTTPRequest
 from tornado.websocket import websocket_connect
 from tornado.ioloop import IOLoop
 
-import access
 import sign
-import admin
 import ujson
+import unittest
 
+from admin import Redirect
+from access import AccessToken
 from database import Database, DatabaseError
 from environment import EnvironmentClient, ApplicationInfoAdapter
 from login import LoginClient, GamespaceAdapter
@@ -24,6 +25,20 @@ TEST_DATABASE_NAME = "test"
 
 class TestError(Exception):
     pass
+
+
+class OptionsLoader(object):
+    loaded = False
+
+    @staticmethod
+    def load():
+        if OptionsLoader.loaded:
+            return
+
+        from server import init
+        init()
+
+        OptionsLoader.loaded = True
 
 
 class ServerTestCase(AsyncTestCase):
@@ -72,6 +87,8 @@ class ServerTestCase(AsyncTestCase):
             cls.test_db = yield ServerTestCase.get_test_db()
         else:
             cls.test_db = None
+
+        OptionsLoader.load()
 
         cls.application = cls.get_server_instance(cls.test_db)
 
@@ -235,6 +252,8 @@ class AcceptanceTestCase(AsyncTestCase):
         else:
             cls.test_db = None
 
+        OptionsLoader.load()
+
         cls.application = cls.get_server_instance(cls.test_db)
 
         cls.http_server = cls.get_http_server()
@@ -273,7 +292,7 @@ class AcceptanceTestCase(AsyncTestCase):
     @classmethod
     def setUpClass(cls):
         super(AcceptanceTestCase, cls).setUpClass()
-        access.AccessToken.init([sign.HMACAccessTokenSignature(key=AcceptanceTestCase.TESTING_KEY)])
+        AccessToken.init([sign.HMACAccessTokenSignature(key=AcceptanceTestCase.TESTING_KEY)])
         IOLoop.current().run_sync(cls.co_setup_class)
 
     @classmethod
@@ -302,15 +321,15 @@ class AcceptanceTestCase(AsyncTestCase):
     @coroutine
     def acquire_access_token(cls, scopes, account=TOKEN_ACCOUNT, gamespace_id=TOKEN_GAMESPACE):
         token = AccessTokenGenerator.generate(sign.TOKEN_SIGNATURE_HMAC, scopes, additional_containers={
-            access.AccessToken.ACCOUNT: str(account),
-            access.AccessToken.GAMESPACE: str(gamespace_id)
+            AccessToken.ACCOUNT: str(account),
+            AccessToken.GAMESPACE: str(gamespace_id)
         }, token_only=True)
 
         # noinspection PyUnresolvedReferences
         if hasattr(cls.application, "token_cache"):
             # noinspection PyUnresolvedReferences
             token_cache = cls.application.token_cache
-            token_cache.store_token_no_db(access.AccessToken(token))
+            token_cache.store_token_no_db(AccessToken(token))
 
         return token
 
@@ -322,9 +341,9 @@ class AcceptanceTestCase(AsyncTestCase):
         if action_class is None:
             raise AssertionError("No such admin action: {0}".format(action_name))
 
-        token = access.AccessToken(AccessTokenGenerator.generate(sign.TOKEN_SIGNATURE_HMAC, [], additional_containers={
-            access.AccessToken.ACCOUNT: str(AcceptanceTestCase.TOKEN_ACCOUNT),
-            access.AccessToken.GAMESPACE: str(AcceptanceTestCase.TOKEN_GAMESPACE)
+        token = AccessToken(AccessTokenGenerator.generate(sign.TOKEN_SIGNATURE_HMAC, [], additional_containers={
+            AccessToken.ACCOUNT: str(AcceptanceTestCase.TOKEN_ACCOUNT),
+            AccessToken.GAMESPACE: str(AcceptanceTestCase.TOKEN_GAMESPACE)
         }, token_only=True))
 
         # noinspection PyUnresolvedReferences
@@ -337,7 +356,7 @@ class AcceptanceTestCase(AsyncTestCase):
         method = getattr(action, method_name)
         try:
             result = yield method(*args, **kwargs)
-        except admin.Redirect as e:
+        except Redirect as e:
             raise Return(e)
 
         raise Return(result)
@@ -478,3 +497,10 @@ class AcceptanceTestCase(AsyncTestCase):
             self.fail("Request /{0} is expected to fail with {1} {2}, succseeded instead".format(
                 path, expected_code, expected_body
             ))
+
+
+if __name__ == "__main__":
+    loader = unittest.TestLoader()
+    tests = loader.discover(".")
+    runner = unittest.TextTestRunner()
+    runner.run(tests)
