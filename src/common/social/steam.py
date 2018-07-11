@@ -16,8 +16,9 @@ class SteamAPI(SocialNetworkAPI):
     STEAM_API = "https://api.steampowered.com"
     NAME = "steam"
 
-    def __init__(self, cache):
-        super(SteamAPI, self).__init__(SteamAPI.NAME, cache)
+    def __init__(self, cache, name=NAME, steam_api=STEAM_API):
+        super(SteamAPI, self).__init__(name, cache)
+        self.steam_api = steam_api
 
     @coroutine
     def api_auth(self, gamespace, ticket, app_id):
@@ -107,7 +108,7 @@ class SteamAPI(SocialNetworkAPI):
         fields.update(**kwargs)
 
         result = yield self.client.fetch(
-            SteamAPI.STEAM_API + "/" + operation + "/" + v + "?" +
+            self.steam_api + "/" + operation + "/" + v + "?" +
             urllib.urlencode(fields))
 
         try:
@@ -132,7 +133,7 @@ class SteamAPI(SocialNetworkAPI):
 
         fields.update(**kwargs)
         result = yield self.client.fetch(
-            SteamAPI.STEAM_API + "/" + operation + "/" + v + "/",
+            self.steam_api + "/" + operation + "/" + v + "/",
             method="POST",
             body=urllib.urlencode(fields))
 
@@ -165,8 +166,8 @@ class SteamPrivateKey(SocialPrivateKey):
     def __init__(self, key):
         super(SteamPrivateKey, self).__init__(key)
 
-        self.key = self.data["key"] if self.data else None
-        self.app_id = self.data["app_id"] if self.data else None
+        self.key = self.data.get("key", "") if self.data else None
+        self.app_id = self.data.get("app_id", "") if self.data else None
 
     def get_app_id(self):
         return self.app_id
