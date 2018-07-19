@@ -287,6 +287,8 @@ class AcceptanceTestCase(AsyncTestCase):
         if scopes:
             cls.access_token = yield cls.acquire_access_token(scopes)
 
+        IOLoop.current().set_blocking_log_threshold(0)
+        
         yield cls.co_setup_acceptance_tests()
 
     @classmethod
