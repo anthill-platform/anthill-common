@@ -119,13 +119,8 @@ class Server(tornado.web.Application):
         else:
             self.monitoring = None
 
-        if self.token_cache_enabled():
-            self.token_cache = access.AccessTokenCache()
-        else:
-            self.token_cache = None
-
+        self.token_cache = None
         self.name = None
-
         self.internal = None
         self.shutting_down = False
 
@@ -269,12 +264,12 @@ class Server(tornado.web.Application):
         """
         return []
 
-    def token_cache_enabled(self):
+    def create_token_cache(self):
         """
-        Is token cache enabled on this server or no (any use of access tokens will be disabled otherwise)
-        :return:
+        Creates a new instance of AccessTokenCache. On some services (such as login) this function
+        may be overridden to return actual source of access tokens
         """
-        return True
+        return access.AccessTokenCache()
 
     @coroutine
     def acquire_subscriber(self):
@@ -305,9 +300,8 @@ class Server(tornado.web.Application):
     @coroutine
     def started(self):
         self.name = options.name
-
-        if self.token_cache_enabled():
-            yield self.token_cache.load(self)
+        self.token_cache = self.create_token_cache()
+        yield self.token_cache.load(self)
 
         self.init_discovery()
         self.internal = internal.Internal()

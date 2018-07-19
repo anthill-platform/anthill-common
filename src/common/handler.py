@@ -23,6 +23,7 @@ import jsonrpc
 import ujson
 import gc
 
+
 class JsonHandlerMixin(object):
     # noinspection PyUnresolvedReferences
     def dumps(self, data):

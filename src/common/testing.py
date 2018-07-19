@@ -290,9 +290,16 @@ class AcceptanceTestCase(AsyncTestCase):
         yield cls.co_setup_acceptance_tests()
 
     @classmethod
+    def setup_access_token(cls):
+        """
+        Override this to initialize AccessToken differently
+        """
+        AccessToken.init([sign.HMACAccessTokenSignature(key=AcceptanceTestCase.TESTING_KEY)])
+
+    @classmethod
     def setUpClass(cls):
         super(AcceptanceTestCase, cls).setUpClass()
-        AccessToken.init([sign.HMACAccessTokenSignature(key=AcceptanceTestCase.TESTING_KEY)])
+        cls.setup_access_token()
         IOLoop.current().run_sync(cls.co_setup_class)
 
     @classmethod
@@ -442,7 +449,7 @@ class AcceptanceTestCase(AsyncTestCase):
         else:
             url = "{0}/{1}?{2}".format(self.host_name, path, urllib.urlencode(query_args))
 
-        if pass_access_token:
+        if pass_access_token and hasattr(self, "access_token"):
             if body is None:
                 body = {}
             body["access_token"] = self.access_token
@@ -455,7 +462,7 @@ class AcceptanceTestCase(AsyncTestCase):
         try:
             result = yield self.http_client.fetch(request)
         except HTTPError as e:
-            self.fail("Failed to perform a {0} request at path /{1}: {2} {3}".format(method, path, e.code, e.message))
+            self.fail("Failed to perform a {0} request at path /{1}: {2} {3}".format(method, path, e.code, e.response.body))
         else:
             if json_response:
                 parsed = ujson.loads(result.body)
@@ -471,7 +478,7 @@ class AcceptanceTestCase(AsyncTestCase):
         else:
             url = "{0}/{1}?{2}".format(self.host_name, path, urllib.urlencode(query_args))
 
-        if pass_access_token:
+        if pass_access_token and hasattr(self, "access_token"):
             if body is None:
                 body = {}
             body["access_token"] = self.access_token
