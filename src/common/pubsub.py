@@ -138,11 +138,17 @@ class RabbitMQPublisher(Publisher):
         self.settings = settings
         self.connection = None
         self.channel = None
-        self.exchanges = {}
+        self.exchanges = set()
         self.name = name
 
     @coroutine
     def publish(self, channel, payload):
+
+        if channel not in self.exchanges:
+            yield self.channel.exchange(
+                exchange=EXCHANGE_PREFIX + channel,
+                exchange_type='fanout')
+            self.exchanges.add(channel)
 
         body = ujson.dumps(payload)
 
