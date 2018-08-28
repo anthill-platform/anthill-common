@@ -68,13 +68,18 @@ class AccessTokenGenerator(AccessToken):
         if token_only:
             return access_token
 
-        return {
+        result = {
             "expires": for_time,
             "account": containers.get(AccessToken.ACCOUNT),
             "key": access_token,
             "uuid": uuid,
             "scopes": requested_scopes
         }
+
+        if name is not None:
+            result["credential"] = name
+
+        return result
 
     @staticmethod
     def refresh(signer_id, token, force=False):
