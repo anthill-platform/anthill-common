@@ -48,7 +48,7 @@ class SteamAPI(SocialNetworkAPI):
 
             steam_id = str(params["steamid"])
 
-            if params["vacbanned"]:
+            if params.get("vacbanned", False):
                 raise APIError(403, "VAC Banned")
 
             result = AuthResponse(
