@@ -5,14 +5,14 @@ from tornado.websocket import websocket_connect
 from tornado.ioloop import IOLoop
 
 from . import sign
-from .admin import Redirect
-from .access import AccessToken
-from .database import Database, DatabaseError
-from .environment import EnvironmentClient, ApplicationInfoAdapter
-from .login import LoginClient, GamespaceAdapter
-from .jsonrpc import JsonRPC
-from .gen import AccessTokenGenerator
-from .options import options
+from . admin import Redirect
+from . access import AccessToken
+from . database import Database, DatabaseError
+from . environment import EnvironmentClient, ApplicationInfoAdapter
+from . login import LoginClient, GamespaceAdapter
+from . jsonrpc import JsonRPC
+from . gen import AccessTokenGenerator
+from . options import options
 
 import ujson
 import unittest
@@ -492,7 +492,7 @@ class AcceptanceTestCase(AsyncTestCase):
 
 if __name__ == "__main__":
     loader = unittest.TestLoader()
-    tests = loader.discover(".")
+    tests = loader.discover("anthill")
     runner = unittest.TextTestRunner()
     result = runner.run(tests)
     if not result.wasSuccessful():
