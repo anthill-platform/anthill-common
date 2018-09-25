@@ -14,11 +14,11 @@ from . import internal
 from . import jsonrpc
 from . import ujson
 
+from urllib import parse
 import base64
 import os
 import psutil
 import logging
-import urllib
 import gc
 
 
@@ -127,7 +127,7 @@ class AuthenticatedHandlerMixin(object):
         args = {
             "scopes": ",".join(set(needed_scopes)),
             "gamespace": self.get_gamespace(),
-            "redirect": self.application.get_host() + "/auth_callback?" + urllib.urlencode({
+            "redirect": self.application.get_host() + "/auth_callback?" + parse.urlencode({
                 "after": self.request.uri
             }),
             "as": (self.authorize_as() or "")
@@ -139,7 +139,7 @@ class AuthenticatedHandlerMixin(object):
         if should_have:
             args["should_have"] = should_have
 
-        self.redirect(auth_location + "/authform?" + urllib.urlencode(args))
+        self.redirect(auth_location + "/authform?" + parse.urlencode(args))
 
     def authorize_as(self):
         return ""

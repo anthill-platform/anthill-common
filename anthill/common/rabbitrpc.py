@@ -1,5 +1,6 @@
 
 from tornado.gen import Future, with_timeout, TimeoutError
+from tornado.ioloop import IOLoop
 
 from . aqmp import AMQPConnection, AMQPQueue
 from . options import options
@@ -52,10 +53,10 @@ class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
         self.named_channels[name] = context
         self.queues[name] = callback_queue
 
-        async def response(channel, method, properties, body):
-            await self.mq.received(context, body, id=int(properties.correlation_id))
+        def response(channel, method, properties, body):
+            IOLoop.current().spawn_callback(self.mq.received, context, body, id=int(properties.correlation_id))
 
-        self.consumers[name] = callback_queue.consume(response, no_ack=True)
+        self.consumers[name] = await callback_queue.consume(response, no_ack=True)
 
         return context
 
@@ -115,7 +116,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
     async def __on_connected__(self, *args, **kwargs):
         pass
 
-    async def __incoming_request__(self, channel, method, properties, body):
+    def __incoming_request__(self, channel, method, properties, body):
         payload = {}
 
         if properties.correlation_id:
@@ -130,7 +131,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
                           routing_key=lambda: str(properties.reply_to),
                           reply_to=lambda: self.callback_queue.routing_key)
 
-        await self.received(context, body, **payload)
+        IOLoop.current().spawn_callback(self.received, context, body, **payload)
 
     def __init__(self):
         super(RabbitMQJsonRPC, self).__init__()
@@ -147,7 +148,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         self.handler_consumer = None
         self.callback_consumer = None
 
-    async def listen(self, broker, internal_name, on_receive, timeout=300):
+    async def listen_broker(self, broker, internal_name, on_receive, timeout=300):
         self.listen_connection = JsonAMQPConnection(
             self,
             broker,
@@ -217,7 +218,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         logging.debug("Sending: {0} to {1} reply {2}".format(ujson.dumps(data), routing_key, reply_to))
 
         try:
-            await channel.basic_publish(
+            channel.basic_publish(
                 exchange='',
                 routing_key=str(routing_key),
                 properties=properties,

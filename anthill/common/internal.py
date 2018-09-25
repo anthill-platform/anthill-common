@@ -92,14 +92,14 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         return any((ipaddress.ip_address(remote_ip) in network) for network in self.internal_locations)
 
     async def listen(self, service_name, on_receive):
-        await super(Internal, self).listen(self.broker, service_name, on_receive)
+        await self.listen_broker(self.broker, service_name, on_receive)
 
     @staticmethod
     def __parse_result__(result, use_json=True, return_headers=False):
-        data = result.body
+        data = result.body.decode()
 
         if not use_json:
-            return str(data)
+            return data
 
         if len(data) == 0:
             return None

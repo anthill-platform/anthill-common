@@ -1,18 +1,15 @@
 
-from tornado.gen import coroutine, Task
-
 import tornado.ioloop
 import logging
 import zmq
-import json
 from zmq.eventloop import zmqstream
 
-from pubsub import Subscriber, Publisher
-from jsonrpc import JsonRPC, JsonRPCError
+from . jsonrpc import JsonRPC, JsonRPCError
 
 
 class ZMQInterProcess(JsonRPC):
     context = zmq.Context.instance()
+    # noinspection PyUnresolvedReferences
     context.set(zmq.MAX_SOCKETS, 999999)
 
     def __init__(self, **settings):
@@ -30,6 +27,7 @@ class ZMQInterProcess(JsonRPC):
         self.stream.on_recv(self.__on_receive__)
 
     def __pre_init__(self):
+        # noinspection PyUnresolvedReferences
         self.socket = self.context.socket(zmq.PAIR)
 
     async def client(self):

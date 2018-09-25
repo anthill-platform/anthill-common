@@ -1,5 +1,4 @@
 
-from tornado.gen import coroutine, Return
 from tornado.web import HTTPError, stream_request_body
 from tornado.websocket import WebSocketClosedError
 
@@ -162,7 +161,7 @@ class AdminController(object):
                 return ujson.dumps(a, sort_keys=True) != ujson.dumps(b, sort_keys=True)
             return str(a) != str(b)
 
-        for key, values in updates.iteritems():
+        for key, values in updates.items():
             if isinstance(values, tuple):
                 if len(values) == 2:
                     if diff(values[0], values[1]):
@@ -258,7 +257,7 @@ class AdminActions(object):
             return None
 
     def list(self):
-        return {action_id: action.scheme() for action_id, action in self.actions.iteritems()}
+        return {action_id: action.scheme() for action_id, action in self.actions.items()}
 
 
 class AdminFile(object):
@@ -290,7 +289,7 @@ class AdminUploadHandler(handler.AuthenticatedHandler):
             self.set_status(ACTION_ERROR, "Action-Error")
         except TypeError as e:
             logging.exception("TypeError")
-            raise HTTPError(400, e.message)
+            raise HTTPError(400, str(e))
         except Redirect as e:
 
             # special status 470 means redirect
@@ -357,7 +356,7 @@ class AdminUploadHandler(handler.AuthenticatedHandler):
             self.finish(e.title)
         except TypeError as e:
             logging.exception("TypeError")
-            raise HTTPError(400, e.message)
+            raise HTTPError(400, str(e))
         except Redirect as e:
 
             # special status 470 means redirect
@@ -419,7 +418,7 @@ class AdminHandler(handler.AuthenticatedHandler):
             return
         except TypeError as e:
             logging.exception("TypeError")
-            raise HTTPError(400, e.message)
+            raise HTTPError(400, str(e))
         except Redirect as e:
 
             # special status 470 means redirect
@@ -480,13 +479,13 @@ class AdminHandler(handler.AuthenticatedHandler):
 
             if isinstance(value, dict):
                 if "@files" in value:
-                    return [AdminFile(name, d) for name, d in value["@files"].iteritems()]
+                    return [AdminFile(name, d) for name, d in value["@files"].items()]
 
             return value
 
         arguments = {
             name: process(name, value)
-            for name, value in data.iteritems()
+            for name, value in data.items()
         }
 
         try:
@@ -826,7 +825,7 @@ def links(links_title, links=None, **kwargs):
     """
 
     l = links or []
-    for url, title in kwargs.iteritems():
+    for url, title in kwargs.items():
         l.append({"title": title, "url": url})
 
     return {
@@ -977,7 +976,7 @@ def file_upload(title, action="", fields=None, data=None):
     f = {}
 
     if fields:
-        for field_id, _field in fields.iteritems():
+        for field_id, _field in fields.items():
             f[field_id] = {"value": data.get(field_id, None)}
             f[field_id].update(_field)
 
@@ -1020,7 +1019,7 @@ def form(title, fields, methods, data, icon=None, id=None, **context):
     """
     f = {}
 
-    for field_id, _field in fields.iteritems():
+    for field_id, _field in fields.items():
         f[field_id] = {"value": data.get(field_id, None)}
         f[field_id].update(_field)
 
@@ -1029,7 +1028,7 @@ def form(title, fields, methods, data, icon=None, id=None, **context):
         "title": title,
         "fields": f,
         "icon": icon,
-        "methods": {method_id: _method for method_id, _method in methods.iteritems()},
+        "methods": {method_id: _method for method_id, _method in methods.items()},
         "context": context
     }
 

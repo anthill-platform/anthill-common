@@ -222,7 +222,7 @@ class AMQPConnection(AMQPObject):
         self._cleanup_channels()
         return [ch() for ch in self._channels]
 
-    async def channel(self, channel_number=None, timeout=None, prefetch_count=None,
+    async def channel(self, channel_number=None, prefetch_count=None,
                       on_close_callback=None, on_return_callback=None,
                       on_cancel_callback=None, on_flow_callback=None, confirm_delivery=None):
         """
@@ -232,7 +232,7 @@ class AMQPConnection(AMQPObject):
                          on_close_callback, on_return_callback, on_cancel_callback,
                          on_flow_callback, confirm_delivery)
 
-        await ch._init_channel(timeout)
+        await ch._init_channel()
         self._cleanup_channels()
         self._channels.append(weakref.ref(ch))
         return ch
@@ -413,7 +413,7 @@ class AMQPChannel(AMQPObject):
         self._channel = None
 
     # noinspection PyBroadException
-    async def _init_channel(self, timeout=None):
+    async def _init_channel(self):
         log = self._get_log('channel')
 
         log.debug('Opening new channel (number=%s)', self._channel_number)
@@ -425,7 +425,7 @@ class AMQPChannel(AMQPObject):
 
             self._amqp_connection.channel(on_open_callback=_callback)
             channel = await f
-        except:
+        except Exception:
             log.exception('Failed to open channel')
             raise
 
@@ -451,7 +451,7 @@ class AMQPChannel(AMQPObject):
         for ex in filter(bool, self._get_exchanges()):
             try:
                 log.debug('Declaring exchange %s', ex.exchange)
-                await ex.declare(timeout)
+                await ex.declare()
             except Exception:
                 log.exception('Failed to declare exchange %s', ex.exchange)
 
@@ -459,7 +459,7 @@ class AMQPChannel(AMQPObject):
         for q in filter(bool, self._get_queues()):
             try:
                 log.debug('Declaring queue %s', q.routing_key)
-                await q.declare(timeout)
+                await q.declare()
             except Exception:
                 log.exception('Failed to declare exchange %s', q.routing_key)
 
@@ -602,7 +602,7 @@ class AMQPChannel(AMQPObject):
         return [qr() for qr in self._queues]
 
     async def queue(self, queue=None, passive=False, durable=False,
-                    exclusive=False, auto_delete=False, arguments=None, timeout=None):
+                    exclusive=False, auto_delete=False, arguments=None):
 
         """
         Creates a new instance of queue, and declares it.
@@ -612,7 +612,7 @@ class AMQPChannel(AMQPObject):
         """
 
         q = AMQPQueue(self, queue, passive, durable, exclusive, auto_delete, arguments)
-        await q.declare(timeout)
+        await q.declare()
         self._cleanup_queues()
         self._queues.append(weakref.ref(q))
         return q
@@ -732,7 +732,7 @@ class AMQPQueue(AMQPMessageDestination):
     # ------------------------------------------------------------------------
 
     # noinspection PyBroadException
-    async def declare(self, timeout=None):
+    async def declare(self):
         log = self._get_log('declare')
 
         future = None
@@ -773,18 +773,17 @@ class AMQPQueue(AMQPMessageDestination):
 
         # If we were bound to things, re-bind
         for exchange, bindings in self._bindings.copy().items():
-            for routing_key, state in bindings.copy().iteritems():
+            for routing_key, state in bindings.copy().items():
                 await self.bind(
                     exchange=exchange,
                     routing_key=routing_key,
                     nowait=state['args']['nowait'],
-                    arguments=state['args']['arguments'],
-                    timeout=timeout)
+                    arguments=state['args']['arguments'])
 
         # If we have any consumers, re-start those
         for c in self._get_consumers():
             if c:
-                await c.consume(timeout)
+                await c.consume()
 
     # noinspection PyBroadException
     async def bind(self, exchange, routing_key=None,
@@ -985,7 +984,7 @@ class AMQPExchange(AMQPMessageDestination):
 
         # If we were bound to things, re-bind
         for exchange, bindings in self._bindings.copy().items():
-            for routing_key, state in bindings.copy().iteritems():
+            for routing_key, state in bindings.copy().items():
                 await self.bind(
                     exchange=exchange,
                     routing_key=routing_key,
@@ -1086,19 +1085,20 @@ class AMQPConsumer(AMQPObject):
         log = self._get_log('_consume')
         try:
             log.debug('Consuming queue %s', self._queue.routing_key)
-            result = self._channel.basic_consume(
+            response = await self._channel.basic_consume(
                 consumer_callback=self._consumer_callback,
                 queue=self._queue.routing_key,
                 no_ack=self._no_ack,
                 exclusive=self._exclusive,
                 consumer_tag=self._consumer_tag_given,
                 arguments=self._arguments)
-            self._consumer_tag = result
-            log.debug('Consumer tag is %s', self._consumer_tag)
         except Exception:
             log.exception('Failed to consume %s', self._queue.routing_key)
             self._consumer_tag = None
             raise
+        else:
+            self._consumer_tag = response.method.consumer_tag
+            log.debug('Consumer tag is %s', self._consumer_tag)
 
     # noinspection PyUnusedLocal
     async def cancel(self, nowait=False, timeout=None):

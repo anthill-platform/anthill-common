@@ -1,9 +1,6 @@
 
-from tornado.gen import coroutine, Return, Task
-from common.options import options
-
-import common.keyvalue
-from common import to_int
+from . import keyvalue, to_int
+from . options import options
 
 import logging
 
@@ -21,18 +18,16 @@ class RateLimitLock(object):
 
     async def rollback(self):
         if not self._allowed:
-            return )
+            return
 
         self._allowed = False
 
-        db = self.limit.kv.acquire(
+        async with self.limit.kv.acquire() as db:
+            keys = [
+                "rate:" + self.action + ":" + self.key + ":" + str(range_)
+                for range_, time_ in RateLimit.RANGES
+            ]
 
-        keys = [
-            "rate:" + self.action + ":" + self.key + ":" + str(range_)
-            for range_, time_ in RateLimit.RANGES
-        ]
-
-        try:
             values = await db.mget(keys)
             pipe = db.pipeline()
 
@@ -40,9 +35,7 @@ class RateLimitLock(object):
                 if value is not None:
                     pipe.incr(key)
 
-            await Task(pipe.execute)
-        finally:
-            await db.release()
+            await pipe.execute()
 
 
 class RateLimit(object):
@@ -83,7 +76,7 @@ class RateLimit(object):
             Missing actions considered unlimited
 
         """
-        self.kv = common.keyvalue.KeyValueStorage(
+        self.kv = keyvalue.KeyValueStorage(
             host=options.rate_cache_host,
             port=options.rate_cache_port,
             db=options.rate_cache_db,
@@ -91,7 +84,7 @@ class RateLimit(object):
 
         self.actions = {}
 
-        for action_name, value in actions.iteritems():
+        for action_name, value in actions.items():
             split = value.split(",")
             if len(split) != 2:
                 logging.error("Bad tuple {0}: wrong number of arguments, expected {1}, got {2}".format(
@@ -125,14 +118,13 @@ class RateLimit(object):
 
         max_requests, requests_in_time = limit
 
-        db = self.kv.acquire()
+        async with self.kv.acquire() as db:
 
-        keys = [
-            "rate:" + action + ":" + key + ":" + str(range_)
-            for range_, time_ in RateLimit.RANGES
-        ]
+            keys = [
+                "rate:" + action + ":" + key + ":" + str(range_)
+                for range_, time_ in RateLimit.RANGES
+            ]
 
-        try:
             values = await db.mget(keys)
 
             for value in values:
@@ -149,7 +141,5 @@ class RateLimit(object):
                 else:
                     pipe.decr(key_)
 
-            await Task(pipe.execute)
+            await pipe.execute()
             return RateLimitLock(self, action, key)
-        finally:
-            await db.release()

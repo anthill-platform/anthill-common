@@ -1,5 +1,5 @@
 
-from tornado.gen import convert_yielded, Return
+from tornado.gen import convert_yielded
 
 import tornado.log
 import tornado.httpclient
@@ -24,15 +24,13 @@ import traceback
 import signal
 import threading
 import logging
-import sys
 from pympler import tracker
 
 # just included to define things
+# noinspection PyUnresolvedReferences
 from .options import default as opts_
 
-from . import retry, ElapsedTime
-
-MAX_WAIT_SECONDS_BEFORE_SHUTDOWN = 5
+from . import ElapsedTime
 
 tornado.netutil.Resolver.configure('tornado.netutil.ThreadedResolver')
 
@@ -160,18 +158,18 @@ class Server(tornado.web.Application):
         if self.monitoring is not None:
             self.monitoring.add_rate("anthill." + self.name + "." + action_name, name_property, **tags)
 
-    def log_request(self, handler):
-        super(Server, self).log_request(handler)
+    def log_request(self, request_handler):
+        super(Server, self).log_request(request_handler)
 
         if self.monitoring is not None:
-            if handler.get_status() < 400:
+            if request_handler.get_status() < 400:
                 self.monitor_rate("web", "request", api=self.api_version)
-            elif handler.get_status() < 500:
+            elif request_handler.get_status() < 500:
                 self.monitor_rate("web", "request.4xx",
-                                  api=self.api_version, code=handler.get_status())
+                                  api=self.api_version, code=request_handler.get_status())
             else:
                 self.monitor_rate("web", "request.5xx",
-                                  api=self.api_version, code=handler.get_status())
+                                  api=self.api_version, code=request_handler.get_status())
 
     def __load_metadata__(self, data):
         data["version"] = self.api_version
@@ -209,6 +207,7 @@ class Server(tornado.web.Application):
         """
         return {}
 
+    # noinspection PyMethodMayBeStatic
     def get_admin_stream(self):
         return {}
 
@@ -295,10 +294,9 @@ class Server(tornado.web.Application):
         await self.token_cache.load(self)
 
         self.init_discovery()
-        self.internal = internal.Internal()
 
-        if self.internal_handler:
-            await self.internal.listen(self.name, self.__on_internal_receive__)
+        internal_ = internal.Internal()
+        await internal_.listen(self.name, self.__on_internal_receive__)
 
         need_account_delete_event = False
 
@@ -398,6 +396,7 @@ class Server(tornado.web.Application):
     def get_host(self):
         return options.host
 
+    # noinspection PyUnusedLocal
     async def __on_internal_receive__(self, context, method, *args, **kwargs):
         if hasattr(self.internal_handler, method):
 
@@ -424,6 +423,7 @@ class Server(tornado.web.Application):
         else:
             raise jsonrpc.JsonRPCError(-32600, "No such method")
 
+    # noinspection PyUnusedLocal
     def __sig_handler__(self, sig, frame):
         if self.shutting_down:
             return
@@ -431,6 +431,7 @@ class Server(tornado.web.Application):
         logging.warning('Caught signal: %s', sig)
         tornado.ioloop.IOLoop.instance().add_callback(self.shutdown)
 
+    # noinspection PyUnusedLocal
     @staticmethod
     def __sigpipe_handler__(sig, frame):
         logging.warning('Caught SIGPIPE')
@@ -458,6 +459,7 @@ class Server(tornado.web.Application):
 
         io_loop = tornado.ioloop.IOLoop.instance()
 
+        # noinspection PyUnusedLocal
         def shutdown_callback(f):
             io_loop.stop()
             logging.info('Stopped!')

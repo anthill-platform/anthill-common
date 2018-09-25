@@ -63,7 +63,7 @@ class InfluxDBMonitoring(Monitoring):
 
     def add_rate(self, name, name_property, **tags):
         existing_group = self.rates.get(name, None)
-        bundled_tags = frozenset(tags.iteritems())
+        bundled_tags = frozenset(tags.items())
 
         if existing_group is None:
             measurement = influx.Measurement(self.db, name=name)
@@ -89,7 +89,7 @@ class InfluxDBMonitoring(Monitoring):
         if len(self.rates) == 0:
             return
 
-        for group_name, measurements in self.rates.iteritems():
+        for group_name, measurements in self.rates.items():
             for measurement in measurements.itervalues():
                 influx.add_measurement(measurement)
 

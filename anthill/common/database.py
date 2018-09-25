@@ -26,6 +26,11 @@ class DatabaseConnection(object):
     async def autocommit(self, value):
         await self.conn.autocommit(value)
 
+    async def init(self):
+        self.conn = await self.pool.get_connection()
+        await self.autocommit(self._def_auto_commit)
+        return self
+
     async def __aenter__(self):
         self.conn = await self.pool.get_connection()
         await self.autocommit(self._def_auto_commit)

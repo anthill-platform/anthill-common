@@ -323,7 +323,7 @@ class AcceptanceTestCase(AsyncTestCase):
         if hasattr(cls.application, "token_cache"):
             # noinspection PyUnresolvedReferences
             token_cache = cls.application.token_cache
-            token_cache.store_token_no_db(AccessToken(token))
+            await token_cache.store_token_no_db(AccessToken(token))
 
         return token
 

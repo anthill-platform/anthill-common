@@ -70,6 +70,6 @@ class Subscriber(object):
                 self.subscriptions.pop(pub_id, None)
 
     def unsubscribe_all(self):
-        for pub_id, subscription in self.subscriptions.iteritems():
+        for pub_id, subscription in self.subscriptions.items():
             publisher = subscription.publisher
             publisher.unsubscribe(list(subscription.events), self.listener)

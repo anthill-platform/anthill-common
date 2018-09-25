@@ -689,10 +689,10 @@ class Profile(object):
                 if object_value is None:
                     object_value = {}
                     item[field] = object_value
-                    for item_key, item_value in value.iteritems():
+                    for item_key, item_value in value.items():
                         Profile.__set_profile_field__(object_value, item_key, item_value, merge=merge)
                 elif isinstance(object_value, dict):
-                    for item_key, item_value in value.iteritems():
+                    for item_key, item_value in value.items():
                         Profile.__set_profile_field__(object_value, item_key, item_value, merge=merge)
                 return
 
@@ -713,7 +713,7 @@ class Profile(object):
                     profile[key] = {}
                 profile = profile[key]
 
-        for key, value in fields.iteritems():
+        for key, value in fields.items():
             Profile.__set_profile_field__(profile, key, value, merge=merge)
 
     @abstractmethod
@@ -856,7 +856,8 @@ class DatabaseProfile(Profile):
         self.conn = None
 
     async def init(self):
-        self.conn = await self.db.acquire(auto_commit=False)
+        self.conn = self.db.acquire(auto_commit=False)
+        await self.conn.init()
 
     async def release(self):
         await self.conn.commit()

@@ -36,7 +36,7 @@ class Discovery(object):
 
         self.services.update({
             (network + ":" + service_id): service_location
-            for service_id, service_location in response_services.iteritems()
+            for service_id, service_location in response_services.items()
         })
 
         return {

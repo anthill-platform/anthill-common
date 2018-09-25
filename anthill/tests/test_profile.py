@@ -1,7 +1,6 @@
 from tornado.testing import AsyncTestCase, gen_test
-from tornado.gen import coroutine, Return
 
-from common.profile import Profile, ProfileError, PredefinedProfile
+from anthill.common.profile import Profile, ProfileError, PredefinedProfile
 
 
 class TestProfile(AsyncTestCase):
