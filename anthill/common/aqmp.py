@@ -503,9 +503,9 @@ class AMQPChannel(AMQPObject):
 
     def basic_consume(self, consumer_callback, queue='', no_ack=False,
                       exclusive=False, consumer_tag=None, arguments=None):
-        return Task(self._channel.basic_consume,
-                    on_message_callback=consumer_callback, queue=queue, auto_ack=no_ack,
-                    exclusive=exclusive, consumer_tag=consumer_tag, arguments=arguments)
+        return self._channel.basic_consume(
+            consumer_callback=consumer_callback, queue=queue, no_ack=no_ack,
+            exclusive=exclusive, consumer_tag=consumer_tag, arguments=arguments)
 
     def basic_get(self, queue='', no_ack=False):
         return Task(self._channel.basic_get, queue=queue, no_ack=no_ack)
@@ -1085,7 +1085,7 @@ class AMQPConsumer(AMQPObject):
         log = self._get_log('_consume')
         try:
             log.debug('Consuming queue %s', self._queue.routing_key)
-            response = await self._channel.basic_consume(
+            consumer_tag = self._channel.basic_consume(
                 consumer_callback=self._consumer_callback,
                 queue=self._queue.routing_key,
                 no_ack=self._no_ack,
@@ -1097,7 +1097,7 @@ class AMQPConsumer(AMQPObject):
             self._consumer_tag = None
             raise
         else:
-            self._consumer_tag = response.method.consumer_tag
+            self._consumer_tag = consumer_tag
             log.debug('Consumer tag is %s', self._consumer_tag)
 
     # noinspection PyUnusedLocal

@@ -1,5 +1,5 @@
 
-from tornado.gen import coroutine
+from tornado.ioloop import IOLoop
 
 from . import rabbitconn
 
@@ -69,7 +69,7 @@ class RabbitMQSubscriber(Subscriber):
         self.name = name or "*"
         self.channel = None
 
-    async def __on_message__(self, channel, method, properties, body):
+    def __on_message__(self, channel, method, properties, body):
 
         exchange_name = method.exchange
         if exchange_name.startswith(EXCHANGE_PREFIX):
@@ -83,7 +83,7 @@ class RabbitMQSubscriber(Subscriber):
             except (KeyError, ValueError):
                 logging.exception("Failed to decode incoming message")
             else:
-                await self.on_receive(channel_name, content)
+                IOLoop.current().spawn_callback(self.on_receive, channel_name, content)
         else:
             logging.error("Bad exchange name")
 

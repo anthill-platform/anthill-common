@@ -302,7 +302,7 @@ class Functions(object):
             return False
 
         if isinstance(object_value, dict):
-            return True, sum(1 for item in object_value.itervalues() if check(item))
+            return True, sum(1 for item in object_value.values() if check(item))
         elif isinstance(object_value, list):
             return True, sum(1 for item in object_value if check(item))
         else:

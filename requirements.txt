@@ -22,7 +22,7 @@ lazy==1.3
 pympler==0.5
 sprockets-influxdb==2.1.0
 aioredis==1.1.0
+pika==0.12.0
 
 git+https://github.com/anthill-utils/PyMySQL.git#egg=PyMySQL
 git+https://github.com/anthill-utils/pyjwt.git#egg=PyJWT
-git+https://github.com/anthill-utils/pika.git#egg=pika
