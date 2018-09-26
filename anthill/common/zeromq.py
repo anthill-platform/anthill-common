@@ -2,6 +2,7 @@
 import tornado.ioloop
 import logging
 import zmq
+import os
 from zmq.eventloop import zmqstream
 
 from . jsonrpc import JsonRPC, JsonRPCError
@@ -9,8 +10,8 @@ from . jsonrpc import JsonRPC, JsonRPCError
 
 class ZMQInterProcess(JsonRPC):
     context = zmq.Context.instance()
-    # noinspection PyUnresolvedReferences
-    context.set(zmq.MAX_SOCKETS, 999999)
+    if os.name != "nt":
+        context.set(zmq.MAX_SOCKETS, 999999)
 
     def __init__(self, **settings):
         super(ZMQInterProcess, self).__init__()
@@ -52,12 +53,29 @@ class ZMQInterProcess(JsonRPC):
     async def server(self):
         self.__pre_init__()
         path = self.settings["path"]
-        logging.info("Listening as server: " + path)
-        try:
-            self.socket.bind("ipc://{0}".format(path))
-        except zmq.ZMQError as e:
-            raise JsonRPCError(500, "Failed to listen socket: " + str(e))
+
+        if path is None:
+            logging.info("Listening as server on random port")
+            try:
+                port = self.socket.bind_to_random_port()
+            except zmq.ZMQError as e:
+                raise JsonRPCError(500, "Failed to listen socket: " + str(e))
+            else:
+                tcp_path = "tcp://127.0.0.1:{0}".format(port)
+                logging.info("Port is: {0}".format(port))
+                result = tcp_path
+        else:
+            logging.info("Listening as server on unix domain sockets: " + path)
+            ipc_path = "ipc://{0}".format(path)
+            try:
+                self.socket.bind(ipc_path)
+            except zmq.ZMQError as e:
+                raise JsonRPCError(500, "Failed to listen socket: " + str(e))
+            else:
+                result = ipc_path
+
         self.__post_init__()
+        return result
 
     async def write_data(self, context, data):
         try:

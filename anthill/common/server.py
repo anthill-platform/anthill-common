@@ -24,6 +24,7 @@ import traceback
 import signal
 import threading
 import logging
+import os
 from pympler import tracker
 
 # just included to define things
@@ -380,7 +381,8 @@ class Server(tornado.web.Application):
     def run(self):
         # noinspection PyUnresolvedReferences,PyProtectedMember
         if isinstance(threading.current_thread(), threading._MainThread):
-            signal.signal(signal.SIGPIPE, Server.__sigpipe_handler__)
+            if os.name != "nt":
+                signal.signal(signal.SIGPIPE, Server.__sigpipe_handler__)
             signal.signal(signal.SIGTERM, self.__sig_handler__)
             signal.signal(signal.SIGINT, self.__sig_handler__)
 
