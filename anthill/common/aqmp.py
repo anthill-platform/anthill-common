@@ -820,8 +820,7 @@ class AMQPQueue(AMQPMessageDestination):
         self._bindings[exchange][routing_key] = state
         return state['bound']
 
-    async def delete(self, if_unused=False, if_empty=False, nowait=False,
-                     timeout=None):
+    async def delete(self, if_unused=False, if_empty=False, timeout=None):
         log = self._get_log('delete')
         try:
             log.debug('Deleting queue %s', self.routing_key)
@@ -829,14 +828,13 @@ class AMQPQueue(AMQPMessageDestination):
                 queue=self.routing_key,
                 if_unused=if_unused,
                 if_empty=if_empty,
-                nowait=nowait,
                 timeout=timeout
             )
-            # We're deleted
-            self._routing_key = None
-        except:
+        except Exception:
             log.exception('Failed to delete queue %s', self.routing_key)
             raise
+        else:
+            self._routing_key = None
 
     # noinspection PyUnusedLocal
     async def purge(self, queue, nowait=False, timeout=None):

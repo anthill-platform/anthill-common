@@ -763,6 +763,8 @@ class Profile(object):
         pass
 
     async def get_data(self, path):
+        if path is not None and not isinstance(path, list):
+            path = list(path)
 
         await self.init()
 
@@ -775,12 +777,15 @@ class Profile(object):
             return None
 
         if path:
-            result = self.__get_field__(data, list(path))
+            result = self.__get_field__(data, path)
             return result
         else:
             return data
 
     async def set_data(self, fields, path, merge=True):
+        if path is not None and not isinstance(path, list):
+            path = list(path)
+
         if not isinstance(fields, dict):
             raise ProfileError("Expected fields to be a dict.")
 
@@ -798,7 +803,7 @@ class Profile(object):
             await self.release()
 
         if path:
-            return Profile.__get_field__(updated, list(path))
+            return Profile.__get_field__(updated, path)
         else:
             return updated
 

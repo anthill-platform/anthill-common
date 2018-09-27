@@ -1,15 +1,18 @@
 
-import tornado.ioloop
-import logging
+from tornado.ioloop import IOLoop
+from asyncio import CancelledError
 import zmq
-import os
+from zmq.asyncio import Context
 from zmq.eventloop import zmqstream
 
 from . jsonrpc import JsonRPC, JsonRPCError
 
+import logging
+import os
+
 
 class ZMQInterProcess(JsonRPC):
-    context = zmq.Context.instance()
+    context = Context.instance()
     if os.name != "nt":
         context.set(zmq.MAX_SOCKETS, 999999)
 
@@ -19,13 +22,15 @@ class ZMQInterProcess(JsonRPC):
         self.stream = None
         self.settings = settings
 
-    def __on_receive__(self, messages):
-        for msg in messages:
-            tornado.ioloop.IOLoop.current().add_callback(self.received, self, msg)
-
-    def __post_init__(self):
-        self.stream = zmqstream.ZMQStream(self.socket)
-        self.stream.on_recv(self.__on_receive__)
+    async def __loop__(self):
+        while True:
+            try:
+                messages = await self.socket.recv_multipart()
+            except CancelledError:
+                break
+            else:
+                for msg in messages:
+                    await self.received(self, msg)
 
     def __pre_init__(self):
         # noinspection PyUnresolvedReferences
@@ -36,19 +41,15 @@ class ZMQInterProcess(JsonRPC):
         path = self.settings["path"]
         logging.info("Listening as client: " + path)
         self.socket.connect("ipc://{0}".format(path))
-        self.__post_init__()
+        IOLoop.current().spawn_callback(self.__loop__)
 
     async def release(self):
-        await super(ZMQInterProcess, self).release()
-
-        path = self.settings["path"]
-        logging.info("Closing: " + path)
-
-        try:
-            self.stream.on_recv(None)
-            self.stream.close()
-        except IOError:
-            pass
+        await super().release()
+        if self.socket:
+            try:
+                self.socket.close()
+            except IOError:
+                pass
 
     async def server(self):
         self.__pre_init__()
@@ -74,11 +75,11 @@ class ZMQInterProcess(JsonRPC):
             else:
                 result = ipc_path
 
-        self.__post_init__()
+        IOLoop.current().spawn_callback(self.__loop__)
         return result
 
     async def write_data(self, context, data):
         try:
-            self.stream.send(data)
+            await self.socket.send_string(data)
         except IOError:
             pass
