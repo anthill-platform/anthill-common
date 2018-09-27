@@ -47,7 +47,7 @@ class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
         callback_queue = await channel.queue(exclusive=True)
 
         context.channel = channel
-        context.routing_key = lambda: "rpc." + name
+        context.routing_key = lambda: "rpc_" + name
         context.reply_to = lambda: callback_queue.routing_key
 
         self.named_channels[name] = context
@@ -149,10 +149,12 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         self.callback_consumer = None
 
     async def listen_broker(self, broker, internal_name, on_receive, timeout=300):
+        rpc_name = "rpc_" + internal_name
+
         self.listen_connection = JsonAMQPConnection(
             self,
             broker,
-            connection_name="rpc." + internal_name,
+            connection_name=rpc_name,
             channel_prefetch_count=1024)
 
         try:
@@ -165,7 +167,7 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
 
         # initial incoming request queue
 
-        self.handler_queue = await self.listen_channel.queue(queue="rpc." + internal_name, auto_delete=True)
+        self.handler_queue = await self.listen_channel.queue(queue=rpc_name, auto_delete=True)
 
         # a queue for response callbacks`
         #
@@ -250,17 +252,25 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         connection = await self.__get_connection__(
             service_broker,
             max_connections=max_connections,
-            connection_name="request.{0}".format(service),
+            connection_name="request_{0}".format(service),
             channel_prefetch_count=options.internal_channel_prefetch_count)
 
         context = await connection.__declare_queue__(service, on_return_callback=self.__on_return__)
         return context
 
-    async def send_request(self, service, method, timeout=jsonrpc.JSONRPC_TIMEOUT, *args, **kwargs):
+    async def send_mq_request(self, service, method, timeout=jsonrpc.JSONRPC_TIMEOUT, *args, **kwargs):
+        """
+        This method has to be distinguished from send_request because it does not yet have a context required
+        to provide a call.
+        """
         context = await self.__get_context__(service)
-        result = await super(RabbitMQJsonRPC, self).send_request(context, method, timeout, *args, **kwargs)
+        result = await self.send_request(context, method, timeout, *args, **kwargs)
         return result
 
-    async def send_rpc(self, service, method, *args, **kwargs):
+    async def send_mq_rpc(self, service, method, *args, **kwargs):
+        """
+        This method has to be distinguished from send_rpc because it does not yet have a context required
+        to provide a call.
+        """
         context = await self.__get_context__(service)
-        await super(RabbitMQJsonRPC, self).send_rpc(context, method, *args, **kwargs)
+        await self.send_rpc(context, method, *args, **kwargs)

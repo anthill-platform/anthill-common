@@ -182,7 +182,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         timer = ElapsedTime("request -> {0}@{1}".format(method, service))
 
         try:
-            result = await self.send_request(service, method, timeout, *args, **kwargs)
+            result = await self.send_mq_request(service, method, timeout, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:
             raise InternalError(e.code, e.message, e.data)
         except jsonrpc.JsonRPCTimeout:
@@ -203,7 +203,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
         """
 
         try:
-            await self.send_rpc(service, method, *args, **kwargs)
+            await self.send_mq_rpc(service, method, *args, **kwargs)
         except jsonrpc.JsonRPCError as e:
             raise InternalError(e.code, e.message, e.data)
 
@@ -211,7 +211,7 @@ class Internal(rabbitrpc.RabbitMQJsonRPC):
 class InternalError(Exception):
     def __init__(self, code, body, response=None):
         self.code = code
-        self.body = body
+        self.body = str(body)
         self.response = response
 
     def __str__(self):

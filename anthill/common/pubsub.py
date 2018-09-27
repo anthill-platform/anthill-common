@@ -51,8 +51,8 @@ class Subscriber(object):
         await self.on_channel_handled(channel)
 
 
-EXCHANGE_PREFIX = "pub."
-QUEUE_PREFIX = "sub."
+EXCHANGE_PREFIX = "pub_"
+QUEUE_PREFIX = "sub_"
 
 
 class RabbitMQSubscriber(Subscriber):

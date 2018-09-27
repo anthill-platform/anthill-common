@@ -28,7 +28,7 @@ class RateLimitLock(object):
                 for range_, time_ in RateLimit.RANGES
             ]
 
-            values = await db.mget(keys)
+            values = await db.mget(*keys)
             pipe = db.pipeline()
 
             for key, value in zip(keys, values):
@@ -125,7 +125,7 @@ class RateLimit(object):
                 for range_, time_ in RateLimit.RANGES
             ]
 
-            values = await db.mget(keys)
+            values = await db.mget(*keys)
 
             for value in values:
                 if value is not None and to_int(value) <= 0:
