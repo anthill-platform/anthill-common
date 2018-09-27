@@ -357,7 +357,7 @@ class Server(tornado.web.Application):
 
         def listen_port(ports):
             for port in ports:
-                self.http_server.listen(int(port), "0.0.0.0")
+                self.http_server.listen(int(port), "127.0.0.1")
 
         def listen_unix(sockets):
             for sock in sockets:
