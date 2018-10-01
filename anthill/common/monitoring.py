@@ -90,7 +90,7 @@ class InfluxDBMonitoring(Monitoring):
             return
 
         for group_name, measurements in self.rates.items():
-            for measurement in measurements.itervalues():
+            for measurement in measurements.values():
                 influx.add_measurement(measurement)
 
         self.rates = {}
