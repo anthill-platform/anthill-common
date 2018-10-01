@@ -29,8 +29,8 @@ DEPENDENCIES = [
 ]
 
 REPOS = [
-    "http://github.com/anthill-utils/PyMySQL/tarball/master#egg=PyMySQL-0.8.0",
-    "http://github.com/anthill-utils/pyjwt/tarball/master#egg=PyJWT-1.6.1"
+    "https://github.com/anthill-utils/PyMySQL/tarball/master#egg=PyMySQL-0.8.0",
+    "https://github.com/anthill-utils/pyjwt/tarball/master#egg=PyJWT-1.6.1"
 ]
 
 setup(
