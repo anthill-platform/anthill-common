@@ -13,6 +13,10 @@ version_validator = re.compile(
 
 
 def get_version():
+    pypigit_version = os.environ.get("PYPIGIT_VERSION", None)
+    if pypigit_version:
+        return pypigit_version
+
     # Return the version if it has been injected into the file by git-archive
     version = tag_re.search('$Format:%D$')
     if version:
