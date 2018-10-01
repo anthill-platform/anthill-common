@@ -16,6 +16,6 @@ services:
   - redis-server
   - rabbitmq
 install:
-  - python setup.py sdist
+  - python setup.py installl
 script:
   - python -m unittest discover -s anthill/common/tests
