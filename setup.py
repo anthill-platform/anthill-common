@@ -1,6 +1,6 @@
 
 from setuptools import setup, find_packages
-from version import get_version
+from pypigit import get_version
 
 DEPENDENCIES = [
     "ipaddress==1.0.22",
