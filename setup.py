@@ -35,8 +35,8 @@ REPOS = [
 
 setup(
     name='anthill-common',
-    setup_requires=["pypigit-version>=0.1.6"],
-    git_version=True,
+    setup_requires=["pypigit-version>=0.1.7"],
+    git_version="0.1.0",
     description='Common utils for Anthill platform',
     author='desertkun',
     license='MIT',
