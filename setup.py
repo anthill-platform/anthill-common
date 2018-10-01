@@ -1,5 +1,6 @@
 
 from setuptools import setup, find_packages
+from version import get_version
 
 DEPENDENCIES = [
     "ipaddress==1.0.22",
@@ -35,7 +36,7 @@ REPOS = [
 
 setup(
     name='anthill-common',
-    version='0.1.0',
+    version=get_version(),
     description='Common utils for Anthill platform',
     author='desertkun',
     license='MIT',
