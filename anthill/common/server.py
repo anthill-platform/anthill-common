@@ -26,6 +26,7 @@ import threading
 import logging
 import os
 from pympler import tracker
+import inspect
 
 # just included to define things
 # noinspection PyUnresolvedReferences
@@ -52,6 +53,7 @@ class Server(tornado.web.Application):
 
         Server._instance = self
 
+        self.root_path = os.path.dirname(inspect.getfile(self.__class__))
         self.has_started = False
         self.started_callback = None
         self.http_server = None
@@ -91,7 +93,7 @@ class Server(tornado.web.Application):
 
         if options.serve_static:
             handlers.append((r'/static/(.*)', tornado.web.StaticFileHandler,
-                             {'path': 'static', "default_filename": "index.html"}))
+                             {'path': Server.module_path('static'), "default_filename": "index.html"}))
 
         handlers.append(('/', self.get_root_handler()))
 
@@ -128,6 +130,13 @@ class Server(tornado.web.Application):
     @classmethod
     def instance(cls):
         return cls._instance
+
+    @classmethod
+    def module_path(cls, *paths):
+        """
+        Returns a path to a file relative to server's main script (anthill/*/server.py)
+        """
+        return os.path.join(cls._instance.root_path, *paths)
 
     def set_started_callback(self, callback):
         if self.has_started:

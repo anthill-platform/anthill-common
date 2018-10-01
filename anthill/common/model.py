@@ -1,6 +1,7 @@
 
 from tornado.gen import coroutine
 from .database import DatabaseError
+from .server import Server
 import logging
 
 
@@ -65,7 +66,7 @@ class Model(object):
             if table_name in tables.values():
                 return
 
-        with (open("sql/{0}.sql".format(table_name))) as f:
+        with (open(Server.module_path("sql", table_name + ".sql"))) as f:
             sql = f.read()
 
         try:
