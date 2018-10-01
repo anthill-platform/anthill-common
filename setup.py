@@ -1,6 +1,5 @@
 
 from setuptools import setup, find_packages
-from pypigit import get_version
 
 DEPENDENCIES = [
     "ipaddress==1.0.22",
@@ -36,7 +35,8 @@ REPOS = [
 
 setup(
     name='anthill-common',
-    version=get_version(),
+    setup_requires=["pypigit-version"],
+    git_version=True,
     description='Common utils for Anthill platform',
     author='desertkun',
     license='MIT',
