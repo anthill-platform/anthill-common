@@ -11,8 +11,8 @@ from . validate import validate, ValidationError
 
 import os
 import logging
-import shutil
-import tempfile
+from shutil import rmtree
+from tempfile import mktemp
 
 
 class SourceCodeError(Exception):
@@ -135,7 +135,7 @@ class ProjectBuild(object):
                         raise SourceCodeError(500, e.__class__.__name__ + ": " + str(e))
 
         except Exception as e:
-            shutil.rmtree(self.build_dir, ignore_errors=True)
+            rmtree(self.build_dir, ignore_errors=True)
             raise e
 
 
@@ -152,25 +152,40 @@ class PrivateSSHKeyContext(object):
     """
 
     def __init__(self, ssh_private_key=None):
+        self.name = None
         self.ssh_private_key = ssh_private_key
         self.sys_fd = None
-        self.key_path = None
+
+    @staticmethod
+    def convert_path(path):
+        separator = os.path.sep
+        if separator != '/':
+            path = path.replace(os.path.sep, '/')
+        return path
 
     def __enter__(self):
         if self.ssh_private_key is None:
             return None
 
-        self.sys_fd, self.key_path = tempfile.mkstemp()
+        self.name = mktemp()
 
-        with open(self.key_path, 'w') as f:
+        with open(self.name, 'w') as f:
             f.write(self.ssh_private_key)
             f.write("\n")
 
-        return self.key_path
+        return PrivateSSHKeyContext.convert_path(self.name)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.sys_fd:
-            os.close(self.sys_fd)
+    def __exit__(self, exc, value, tb):
+        self.cleanup()
+
+    def cleanup(self):
+        if self.name is None:
+            return
+
+        try:
+            os.remove(self.name)
+        except IOError:
+            pass
 
 
 def git_ssh_environment(g, ssh_private_key_filename=None):
