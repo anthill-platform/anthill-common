@@ -35,6 +35,9 @@ REPOS = [
 
 setup(
     name='anthill-common',
+    package_data={
+      "anthill.common": ["anthill/common/sql", "anthill/common/static"]
+    },
     setup_requires=["pypigit-version"],
     git_version="0.1.0",
     description='Common utils for Anthill platform',
