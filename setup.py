@@ -25,12 +25,11 @@ DEPENDENCIES = [
     "aioredis==1.1.0",
     "pika==0.12.0",
     "PyMySQL==0.8.0",
-    "PyJWT==1.6.1"
+    "PyJWT==1.6.4"
 ]
 
 REPOS = [
-    "git+https://github.com/anthill-utils/PyMySQL.git@0.8.0#egg=PyMySQL-0.8.0",
-    "git+https://github.com/anthill-utils/pyjwt.git@1.6.1#egg=PyJWT-1.6.1"
+    "git+https://github.com/anthill-utils/PyMySQL.git@0.8.0#egg=PyMySQL-0.8.0"
 ]
 
 setup(

@@ -1,5 +1,7 @@
 
 import abc
+from cryptography.hazmat.backends.openssl.backend import backend
+from cryptography.hazmat.primitives import serialization
 
 
 TOKEN_SIGNATURE_RSA = 'RS256'
@@ -22,10 +24,6 @@ class AccessTokenSignature(object):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def sign_password(self):
-        raise NotImplementedError()
-
-    @abc.abstractmethod
     def validate_key(self):
         raise NotImplementedError()
 
@@ -35,22 +33,23 @@ class RSAAccessTokenSignature(AccessTokenSignature):
         AccessTokenSignature.__init__(self)
 
         if private_key:
-            with open(private_key) as f:
-                self.private = f.read()
+            with open(private_key, "rb") as f:
+                self.private = serialization.load_pem_private_key(
+                    f.read(),
+                    password=password.encode(),
+                    backend=backend)
         else:
             self.private = None
-        self.password = password.encode() if password else None
-        with open(public_key) as f:
-            self.public = f.read()
+        with open(public_key, "rb") as f:
+            self.public = serialization.load_pem_public_key(
+                f.read(),
+                backend=backend)
 
     def id(self):
         return TOKEN_SIGNATURE_RSA
 
     def sign_key(self):
         return self.private
-
-    def sign_password(self):
-        return self.password
 
     def validate_key(self):
         return self.public
@@ -66,9 +65,6 @@ class HMACAccessTokenSignature(AccessTokenSignature):
 
     def sign_key(self):
         return self.key
-
-    def sign_password(self):
-        return None
 
     def validate_key(self):
         return self.key

@@ -52,17 +52,9 @@ class AccessTokenGenerator(AccessToken):
             AccessToken.UUID: uuid
         })
 
-        password = signer.sign_password()
-
-        if password is None:
-            access_token = jwt.encode(
-                containers, signer.sign_key(),
-                algorithm=signer_id)
-        else:
-            access_token = jwt.encode(
-                containers, signer.sign_key(),
-                algorithm=signer_id,
-                password=signer.sign_password())
+        access_token = jwt.encode(
+            containers, signer.sign_key(),
+            algorithm=signer_id)
 
         if token_only:
             return access_token
