@@ -58,7 +58,7 @@ class ZMQInterProcess(JsonRPC):
         if path is None:
             logging.info("Listening as server on random port")
             try:
-                port = self.socket.bind_to_random_port()
+                port = self.socket.bind_to_random_port("tcp://127.0.0.1")
             except zmq.ZMQError as e:
                 raise JsonRPCError(500, "Failed to listen socket: " + str(e))
             else:
