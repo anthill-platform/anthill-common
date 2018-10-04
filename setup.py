@@ -45,6 +45,7 @@ setup(
     author_email='desertkun@gmail.com',
     url='https://github.com/anthill-platform/anthill-common',
     namespace_packages=["anthill"],
+    include_package_data=True,
     packages=find_packages(),
     zip_safe=False,
     install_requires=DEPENDENCIES,
