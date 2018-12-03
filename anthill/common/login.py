@@ -89,4 +89,4 @@ class LoginClient(object):
         if gamespace_list is None:
             return None
 
-        return map(GamespaceAdapter, gamespace_list)
+        return list(map(GamespaceAdapter, gamespace_list))

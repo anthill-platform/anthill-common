@@ -130,6 +130,6 @@ define("serve_static",
 # Other
 
 define("debug",
-       default=True,
+       default=False,
        help="Is debug mode enabled (includes full stack trace)",
        type=bool)

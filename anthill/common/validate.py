@@ -21,11 +21,13 @@ def validate(**fields):
     def wrapper1(method):
         def wrapper2(*args, **kwargs):
 
-            _args, _varargs, _varkw, _defaults_values, _kwonlyargs, _kwonlydefaults, annotations = \
-                inspect.getfullargspec(method)
-            _kwargs = _kwonlyargs or []
+            _args, _varargs, _varkw, _defaults_values, i1, i2, i3 = inspect.getfullargspec(method)
 
-            _defaults = _kwonlydefaults or {}
+            # this nasty trick makes a dict from tail of _args with _defaults_values as values
+            kwarg_defaults = {
+                key: value
+                for key, value in zip(_args[-len(_defaults_values):], _defaults_values)
+            } if _defaults_values is not None else None
 
             # this generator will return tuples (name, value) of *args
             def _list_args():
@@ -35,28 +37,16 @@ def validate(**fields):
 
             # this generator will return tuples (name, value) of **kwargs with their default values, if omitted
             def _list_kwargs():
-                for argument_name in _kwargs:
-                    try:
-                        argument_value = kwargs.pop(argument_name)
-                    except KeyError:
-                        try:
-                            argument_value = _defaults.pop(argument_name)
-                        except KeyError:
-                            raise ValidationError("Argument {0} is not set and no "
-                                                  "default value is provided".format(argument_name))
-                        else:
-                            _default = True
-                    else:
-                        _default = argument_value == _defaults.pop(argument_name, None)
-
-                    yield (argument_name, argument_value, _default)
-
-                # give the rest kwargs not mentioned in validation
                 for argument_name, argument_value in kwargs.items():
-                    yield (argument_name, argument_value, False)
+                    if kwarg_defaults is None:
+                        yield (argument_name, argument_value, False)
+                    elif argument_name in kwarg_defaults:
+                        default_value = kwarg_defaults[argument_name]
+                        yield (argument_name, argument_value, argument_value == default_value)
+                    else:
+                        yield (argument_name, argument_value, False)
 
-            def validate_arg(t):
-                field_name, field = t
+            def validate_arg(field_name, field):
                 validator_name = fields.get(field_name)
                 if not validator_name:
                     return field
@@ -84,13 +74,13 @@ def validate(**fields):
                     raise ValidationError("No such validator {0}".format(validator_name))
                 return validator(field_name, value)
 
-            result_args = map(validate_arg, _list_args())
-            result_kwargs = {
+            return method(*[
+                validate_arg(field_name, field)
+                for field_name, field in _list_args()
+            ], **{
                 field_name: field if _default else validate_kwarg(field_name, field)
                 for field_name, field, _default in _list_kwargs()
-            }
-
-            return method(*result_args, **result_kwargs)
+            })
 
         return wrapper2
     return wrapper1

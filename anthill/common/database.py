@@ -1,10 +1,7 @@
 
-from tornado.gen import coroutine, Return, Task
-
 import tormysql
 import tormysql.cursor
 
-# noinspection PyUnresolvedReferences
 from pymysql import DatabaseError as DatabaseError
 from pymysql import OperationalError as ConnectionError
 from pymysql import IntegrityError as DuplicateError

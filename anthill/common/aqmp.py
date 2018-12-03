@@ -532,7 +532,7 @@ class AMQPChannel(AMQPObject):
         self._channel.close(reply_code=reply_code, reply_text=reply_text)
 
     def confirm_delivery(self, callback=None):
-        return Task(self._channel.confirm_delivery, ack_nack_callback=callback)
+        return self._channel.confirm_delivery(callback)
 
     def open(self):
         return self._connection.open()
@@ -820,15 +820,14 @@ class AMQPQueue(AMQPMessageDestination):
         self._bindings[exchange][routing_key] = state
         return state['bound']
 
-    async def delete(self, if_unused=False, if_empty=False, timeout=None):
+    async def delete(self, if_unused=False, if_empty=False):
         log = self._get_log('delete')
         try:
             log.debug('Deleting queue %s', self.routing_key)
             await self._channel.queue_delete(
                 queue=self.routing_key,
                 if_unused=if_unused,
-                if_empty=if_empty,
-                timeout=timeout
+                if_empty=if_empty
             )
         except Exception:
             log.exception('Failed to delete queue %s', self.routing_key)
@@ -976,7 +975,7 @@ class AMQPExchange(AMQPMessageDestination):
         finally:
             # If we opened a temporary channel, close it
             if self._passive and ch.is_open:
-                await ch.close()
+                ch.close()
 
         self._declared = True
 

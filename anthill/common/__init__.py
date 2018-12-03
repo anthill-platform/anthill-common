@@ -225,7 +225,7 @@ class Flags(object):
     def __init__(self, flags=None):
         if flags:
             if isinstance(flags, (set, list,)):
-                self._flags = set(filter(lambda flag: isinstance(flag, (str, unicode,)), flags))
+                self._flags = set(filter(lambda flag: isinstance(flag, str), flags))
             else:
                 self._flags = set()
         else:

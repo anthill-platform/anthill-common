@@ -1,6 +1,6 @@
 # Anthill Commons Module 
 
-[![Build Status](https://travis-ci.org/anthill-platform/anthill-common.svg)](https://travis-ci.org/anthill-platform/anthill-common)
+[![Build Status](https://travis-ci.org/anthill-platform/anthill-common.svg?branch=0.1.dev0)](https://travis-ci.org/anthill-platform/anthill-common)
 ![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)
 ![PyPI pyversions](https://img.shields.io/badge/python-3.5-blue.svg)
 
