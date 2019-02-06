@@ -1,5 +1,4 @@
 
-from tornado.gen import coroutine, Return
 from abc import ABCMeta, abstractmethod
 
 

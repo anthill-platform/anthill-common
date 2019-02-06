@@ -12,7 +12,7 @@ from . validate import validate, ValidationError
 import os
 import logging
 from shutil import rmtree
-from tempfile import mktemp
+from tempfile import mkstemp
 
 
 class SourceCodeError(Exception):
@@ -167,9 +167,9 @@ class PrivateSSHKeyContext(object):
         if self.ssh_private_key is None:
             return None
 
-        self.name = mktemp()
+        self.sys_fd, self.name = mkstemp()
 
-        with open(self.name, 'w') as f:
+        with os.fdopen(self.sys_fd, 'w') as f:
             f.write(self.ssh_private_key)
             f.write("\n")
 
@@ -183,6 +183,7 @@ class PrivateSSHKeyContext(object):
             return
 
         try:
+            os.close(self.sys_fd)
             os.remove(self.name)
         except IOError:
             pass
