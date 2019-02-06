@@ -786,8 +786,7 @@ class AMQPQueue(AMQPMessageDestination):
                 await c.consume()
 
     # noinspection PyBroadException
-    async def bind(self, exchange, routing_key=None,
-                   nowait=False, arguments=None, timeout=None):
+    async def bind(self, exchange, routing_key=None, arguments=None):
         log = self._get_log('bind')
 
         if isinstance(exchange, AMQPExchange):
@@ -795,7 +794,6 @@ class AMQPQueue(AMQPMessageDestination):
 
         state = {
             'args': {
-                'nowait': nowait,
                 'arguments': arguments,
             },
             'bound': False,
@@ -807,13 +805,11 @@ class AMQPQueue(AMQPMessageDestination):
                 queue=self.routing_key,
                 exchange=exchange or '',
                 routing_key=routing_key,
-                nowait=nowait,
-                arguments=arguments,
-                timeout=timeout)
+                arguments=arguments)
             # We should be bound now.
             state['bound'] = True
-        except:
-            log.debug('Failed to bind to %s:%s', exchange, routing_key)
+        except Exception as e:
+            log.debug('Failed to bind to %s:%s %s', exchange, routing_key, str(e))
 
         if exchange not in self._bindings:
             self._bindings[exchange] = {}
