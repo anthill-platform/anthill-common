@@ -10,7 +10,6 @@ DEPENDENCIES = [
     "pycryptodome==3.6.6",
     "mysql-connector-python==8.0.12",
     "GitPython==2.1.7",
-    "tormysql==0.4.0",
     "Sphinx==1.8.1",
     "pyOpenSSL==18.0.0",
     "cffi==1.11.5",
@@ -24,12 +23,9 @@ DEPENDENCIES = [
     "sprockets-influxdb==2.1.0",
     "aioredis==1.1.0",
     "pika==0.12.0",
-    "PyMySQL==0.8.0",
+    "anthill-PyMySQL==0.9.999",
+    "anthill-tormysql==0.4.0",
     "PyJWT==1.6.4"
-]
-
-REPOS = [
-    "git+https://github.com/anthill-utils/PyMySQL.git@0.8.0#egg=PyMySQL-0.8.0"
 ]
 
 setup(
@@ -48,6 +44,5 @@ setup(
     include_package_data=True,
     packages=find_packages(),
     zip_safe=False,
-    install_requires=DEPENDENCIES,
-    dependency_links=REPOS
+    install_requires=DEPENDENCIES
 )
