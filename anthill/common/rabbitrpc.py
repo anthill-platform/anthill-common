@@ -89,9 +89,7 @@ class JsonAMQPConnectionPool(rabbitconn.RoundRobinPool):
     async def __new_object__(self, **kwargs):
         connection = JsonAMQPConnection(self.mq, self.broker, self.connection_name, **kwargs)
         await connection.wait_connect()
-
-        logging.debug("New connection constructed in a pool")
-
+        logging.info("New connection constructed: {0}".format(self.broker))
         return connection
 
 
@@ -105,7 +103,9 @@ class RabbitMQJsonRPC(jsonrpc.JsonRPC):
         pool = JsonAMQPConnectionPool(
             self, broker, max_connections=max_connections, **kwargs)
 
-        logging.info("New connection pool created: " + broker)
+        logging.info("New connection pool created: {0} ({1} max conn)".format(
+            broker, max_connections))
+
         connection = await pool.get()
         self.pools[broker] = pool
         return connection
