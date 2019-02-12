@@ -8,9 +8,7 @@ TOKEN_SIGNATURE_RSA = 'RS256'
 TOKEN_SIGNATURE_HMAC = 'HS256'
 
 
-class AccessTokenSignature(object):
-
-    __metaclass__ = abc.ABCMeta
+class AccessTokenSignature(object, metaclass=abc.ABCMeta):
 
     def __init__(self):
         pass

@@ -29,8 +29,7 @@ class LoginClientError(Exception):
         self.message = message
 
 
-class LoginClient(object):
-    __metaclass__ = singleton.Singleton
+class LoginClient(object, metaclass=singleton.Singleton):
 
     def __init__(self, cache):
         self.cache = cache

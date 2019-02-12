@@ -204,8 +204,7 @@ class MetaEnum(type):
             return x in cls.ALL
 
 
-class Enum(object):
-    __metaclass__ = MetaEnum
+class Enum(object, metaclass=MetaEnum):
     ALL = {}
 
     def __init__(self, method):

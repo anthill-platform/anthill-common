@@ -583,7 +583,7 @@ class NoDataError(Exception):
     pass
 
 
-class Profile(object):
+class Profile(object, metaclass=ABCMeta):
 
     """
     A class that represents abstract Profile.
@@ -652,8 +652,6 @@ class Profile(object):
     See FUNCTIONS dict for complete list of supported functions.
         
     """
-
-    __metaclass__ = ABCMeta
 
     @staticmethod
     def __get_field__(item, path):
@@ -811,7 +809,7 @@ class Profile(object):
         return Profile.__merge_profiles__(old_root, new_data, path=path, merge=merge)
 
 
-class DatabaseProfile(Profile):
+class DatabaseProfile(Profile, metaclass=ABCMeta):
 
     """
     A yet abstract implementation of Profile object that uses Database as storage that allows concurrent requests
@@ -851,8 +849,6 @@ class DatabaseProfile(Profile):
                 ''', ujson.dumps(data), ...)
     
     """
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, db):
         super(Profile, self).__init__()

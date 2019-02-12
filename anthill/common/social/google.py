@@ -10,8 +10,7 @@ from .. import admin as a
 from .. social import SocialNetworkAPI, APIError, AuthResponse, SocialPrivateKey
 
 
-class GoogleAPI(SocialNetworkAPI):
-    __metaclass__ = abc.ABCMeta
+class GoogleAPI(SocialNetworkAPI, metaclass=abc.ABCMeta):
 
     GOOGLE_OAUTH = "https://www.googleapis.com/oauth2/"
     NAME = "google"

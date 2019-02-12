@@ -8,8 +8,7 @@ from .. import admin as a
 from .. social import SocialNetworkAPI, APIError, AuthResponse, SocialPrivateKey
 
 
-class VKAPI(SocialNetworkAPI):
-    __metaclass__ = abc.ABCMeta
+class VKAPI(SocialNetworkAPI, metaclass=abc.ABCMeta):
 
     VK_OAUTH = "https://oauth.vk.com/"
     VK_API = "https://api.vk.com/method/"

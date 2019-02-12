@@ -16,13 +16,14 @@ from urllib import parse
 import ujson
 
 
-class Internal(rabbitrpc.RabbitMQJsonRPC):
+class Internal(rabbitrpc.RabbitMQJsonRPC, metaclass=singleton.Singleton):
     """
     Internal class is user for 'internal' communication between services across the environment.
     """
-    __metaclass__ = singleton.Singleton
 
     def __init__(self):
+        logging.info("Constructing new Internal instance")
+
         self.client = tornado.httpclient.AsyncHTTPClient()
 
         self.internal_locations = [

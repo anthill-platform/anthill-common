@@ -29,8 +29,7 @@ class ApplicationInfoAdapter(object):
         }
 
 
-class EnvironmentClient(object):
-    __metaclass__ = singleton.Singleton
+class EnvironmentClient(object, metaclass=singleton.Singleton):
 
     def __init__(self, cache):
         self.internal = internal.Internal()

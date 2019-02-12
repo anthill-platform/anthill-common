@@ -12,12 +12,10 @@ from .. social import APIError
 from . steam import SteamAPI, SteamPrivateKey
 
 
-class MailRuAPI(SteamAPI):
+class MailRuAPI(SteamAPI, metaclass=abc.ABCMeta):
     """
     MailRu API pretty much copies Steam API
     """
-
-    __metaclass__ = abc.ABCMeta
 
     MAILRU_API = "https://games.mail.ru/app/"
     STEAM_API = "https://api.games.mail.ru/steam"

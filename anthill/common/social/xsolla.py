@@ -10,8 +10,7 @@ from .. import admin as a
 from .. social import SocialNetworkAPI, APIError, SocialPrivateKey
 
 
-class XsollaAPI(SocialNetworkAPI):
-    __metaclass__ = abc.ABCMeta
+class XsollaAPI(SocialNetworkAPI, metaclass=abc.ABCMeta):
 
     XSOLLA_API = "https://api.xsolla.com"
     NAME = "xsolla"

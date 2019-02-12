@@ -70,9 +70,7 @@ class RabbitMQConnection(aqmp.AMQPConnection):
         self.channel_pool.release(channel)
 
 
-class RoundRobinPool(list):
-
-    __metaclass__ = ABCMeta
+class RoundRobinPool(list, metaclass=ABCMeta):
 
     def __init__(self, max_objects, **kwargs):
         super(RoundRobinPool, self).__init__()

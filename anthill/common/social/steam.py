@@ -8,8 +8,7 @@ from .. import admin as a
 from .. social import SocialNetworkAPI, APIError, AuthResponse, SocialPrivateKey
 
 
-class SteamAPI(SocialNetworkAPI):
-    __metaclass__ = abc.ABCMeta
+class SteamAPI(SocialNetworkAPI, metaclass=abc.ABCMeta):
 
     STEAM_API = "https://api.steampowered.com"
     NAME = "steam"

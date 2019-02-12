@@ -5,8 +5,7 @@ from . import internal
 from . import singleton
 
 
-class Discovery(object):
-    __metaclass__ = singleton.Singleton
+class Discovery(object, metaclass=singleton.Singleton):
 
     def __init__(self):
         self.discovery_service = options.discovery_service
