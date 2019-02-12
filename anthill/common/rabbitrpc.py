@@ -67,9 +67,8 @@ class JsonAMQPConnection(rabbitconn.RabbitMQConnection):
 
         def closed(*args, **kwargs):
             closed_future.set_result(True)
-        await self.add_on_close_callback(closed)
+        self.add_on_close_callback(closed)
         await closed_future
-        pass
 
     def __init__(self, mq, broker, connection_name=None, channel_prefetch_count=0, **kwargs):
         super(JsonAMQPConnection, self).__init__(broker, connection_name, channel_prefetch_count, **kwargs)
