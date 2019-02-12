@@ -262,10 +262,10 @@ class AccessTokenCache(object):
         if issuer is None:
             return True
 
-        if await db.get("inv:" + uuid):
+        if await db.get("inv:" + uuid, encoding="utf-8"):
             return False
 
-        db_account = await db.get("id:" + uuid)
+        db_account = await db.get("id:" + uuid, encoding="utf-8")
 
         # keyvalue storage returns bytes, we have strings
         if db_account and db_account.decode() == account:
