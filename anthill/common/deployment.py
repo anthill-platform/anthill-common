@@ -195,7 +195,7 @@ class DeploymentMethods(object):
 
     @staticmethod
     def types():
-        return DeploymentMethods.METHODS.keys()
+        return list(DeploymentMethods.METHODS.keys())
 
     @staticmethod
     def get(method):
