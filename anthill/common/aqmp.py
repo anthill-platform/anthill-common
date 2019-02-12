@@ -777,7 +777,6 @@ class AMQPQueue(AMQPMessageDestination):
                 await self.bind(
                     exchange=exchange,
                     routing_key=routing_key,
-                    nowait=state['args']['nowait'],
                     arguments=state['args']['arguments'])
 
         # If we have any consumers, re-start those
