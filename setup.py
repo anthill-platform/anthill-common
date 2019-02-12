@@ -20,7 +20,7 @@ DEPENDENCIES = [
     "psutil==5.4.7",
     "lazy==1.3",
     "pympler==0.6",
-    "sprockets-influxdb==2.1.0",
+    "sprockets-influxdb==2.2.0",
     "aioredis==1.1.0",
     "pika==0.12.0",
     "anthill-PyMySQL==0.9.999",
