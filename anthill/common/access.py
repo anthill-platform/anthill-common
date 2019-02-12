@@ -266,7 +266,9 @@ class AccessTokenCache(object):
             return False
 
         db_account = await db.get("id:" + uuid)
-        if db_account == account:
+
+        # keyvalue storage returns bytes, we have strings
+        if db_account and db_account.decode() == account:
             return True
 
         try:
