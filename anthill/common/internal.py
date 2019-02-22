@@ -74,7 +74,8 @@ class Internal(rabbitrpc.RabbitMQJsonRPC, metaclass=singleton.Singleton):
             result = await self.client.fetch(request)
 
         except tornado.httpclient.HTTPError as e:
-            raise InternalError(e.code, e.response.body if hasattr(e.response, "body") else "", e.response)
+            message = e.response.body if hasattr(e.response, "body") else b""
+            raise InternalError(e.code, str(message, "utf-8"), e.response)
 
         except socket.error as e:
             logging.exception("get {0}: {1}".format(service, url))

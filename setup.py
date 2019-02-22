@@ -16,7 +16,8 @@ DEPENDENCIES = [
     "cryptography==2.3.1",
     "expiringdict==1.1.4",
     "python-geoip-python3==1.3",
-    "python-geoip-geolite2-yplan==2017.608",
+    # get the latest available
+    "python-geoip-geolite2-yplan",
     "psutil==5.4.7",
     "lazy==1.3",
     "pympler==0.6",
