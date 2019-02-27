@@ -7,7 +7,7 @@ import logging
 
 class Model(object):
 
-    async def __setup_event__(self, event_name):
+    async def __setup_event__(self, event_name, application):
         events = await self.get_setup_db().get(
             """
                 SHOW EVENTS LIKE %s;
@@ -17,7 +17,7 @@ class Model(object):
             if event_name in events.values():
                 return
 
-        with (open("sql/{0}.sql".format(event_name))) as f:
+        with (open(application.module_path("sql/{0}.sql".format(event_name)))) as f:
             sql = f.read()
 
         try:
@@ -32,7 +32,7 @@ class Model(object):
             if hasattr(self, method_name):
                 await getattr(self, method_name)()
 
-    async def __setup_trigger__(self, trigger_name):
+    async def __setup_trigger__(self, trigger_name, application):
         triggers = await self.get_setup_db().get(
             """
                 SHOW TRIGGERS WHERE `Trigger`=%s;
@@ -41,7 +41,7 @@ class Model(object):
         if triggers:
             return
 
-        with (open("sql/{0}.sql".format(trigger_name))) as f:
+        with (open(application.module_path("sql/{0}.sql".format(trigger_name)))) as f:
             sql = f.read()
 
         try:
@@ -56,7 +56,7 @@ class Model(object):
             if hasattr(self, method_name):
                 await getattr(self, method_name)()
 
-    async def __setup_table__(self, table_name):
+    async def __setup_table__(self, table_name, application):
         tables = await self.get_setup_db().get(
             """
                 SHOW TABLES LIKE %s;
@@ -66,7 +66,7 @@ class Model(object):
             if table_name in tables.values():
                 return
 
-        with (open(Server.module_path("sql", table_name + ".sql"))) as f:
+        with (open(application.module_path("sql/{0}.sql".format(table_name)))) as f:
             sql = f.read()
 
         try:
@@ -102,13 +102,13 @@ class Model(object):
 
     async def started(self, application):
         for table in self.get_setup_tables():
-            await self.__setup_table__(table)
+            await self.__setup_table__(table, application)
 
         for event in self.get_setup_events():
-            await self.__setup_event__(event)
+            await self.__setup_event__(event, application)
 
         for trigger in self.get_setup_triggers():
-            await self.__setup_trigger__(trigger)
+            await self.__setup_trigger__(trigger, application)
 
         logging.info("Model '{0}' started".format(self.__class__.__name__))
 
