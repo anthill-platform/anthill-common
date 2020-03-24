@@ -2,6 +2,7 @@
 from tornado.ioloop import IOLoop
 
 from . import rabbitconn
+from pika.exceptions import ChannelClosed
 
 import logging
 import ujson
@@ -141,10 +142,15 @@ class RabbitMQPublisher(Publisher):
 
         logging.info("Publishing '{0}' : {1}.".format(channel, body))
 
-        self.channel.basic_publish(
-            exchange=EXCHANGE_PREFIX + channel,
-            routing_key='',
-            body=body)
+        try:
+            self.channel.basic_publish(
+                exchange=EXCHANGE_PREFIX + channel,
+                routing_key='',
+                body=body)
+        except ChannelClosed:
+            logging.info("Channel '{0}' closed.".format(channel))
+            await self.release()
+            await self.start()
 
     async def release(self):
         self.connection.close()
