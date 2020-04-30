@@ -18,7 +18,7 @@ DEPENDENCIES = [
     "python-geoip-python3==1.3",
     # get the latest available
     "python-geoip-geolite2-yplan",
-    "psutil==5.4.7",
+    "psutil==5.6.6",
     "lazy==1.3",
     "pympler==0.6",
     "sprockets-influxdb==2.2.0",
