@@ -188,6 +188,11 @@ class ConditionError(Exception):
 
 
 class ConditionFunctions(object):
+
+    @staticmethod
+    def format_path(path):
+        return "$.\"{0}\"".format("\".\"".join(path.split(".")))
+
     @staticmethod
     def equal(field, path, obj):
         if "@value" not in obj:
@@ -199,7 +204,7 @@ class ConditionFunctions(object):
             raise ConditionError("Bad value")
 
         return "CAST(JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) AS CHAR) = %s".format(field), \
-               ["$.\"{0}\"".format(path), str(value)]
+               [ConditionFunctions.format_path(path), str(value)]
 
     @staticmethod
     def greater_than(field, path, obj):
@@ -211,7 +216,7 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) > %s".format(field), ["$.\"{0}\"".format(path), value]
+        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) > %s".format(field), [ConditionFunctions.format_path(path), value]
 
     @staticmethod
     def less_than(field, path, obj):
@@ -223,7 +228,7 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) < %s".format(field), ["$.\"{0}\"".format(path), value]
+        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) < %s".format(field), [ConditionFunctions.format_path(path), value]
 
     @staticmethod
     def greater_or_equal_than(field, path, obj):
@@ -235,7 +240,7 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) >= %s".format(field), ["$.\"{0}\"".format(path), value]
+        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) >= %s".format(field), [ConditionFunctions.format_path(path), value]
 
     @staticmethod
     def lass_or_equal_than(field, path, obj):
@@ -247,7 +252,7 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) <= %s".format(field), ["$.\"{0}\"".format(path), value]
+        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) <= %s".format(field), [ConditionFunctions.format_path(path), value]
 
     @staticmethod
     def not_equal(field, path, obj):
@@ -259,7 +264,7 @@ class ConditionFunctions(object):
         if not isinstance(value, (int, float)):
             raise ConditionError("Bad value")
 
-        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) != %s".format(field), ["$.\"{0}\"".format(path), value]
+        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) != %s".format(field), [ConditionFunctions.format_path(path), value]
 
     @staticmethod
     def between(field, path, obj):
@@ -276,7 +281,7 @@ class ConditionFunctions(object):
         if not isinstance(b, (int, float)):
             raise ConditionError("Bad @b value")
 
-        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) BETWEEN %s AND %s".format(field), ["$.\"{0}\"".format(path), a, b]
+        return "JSON_UNQUOTE(JSON_EXTRACT(`{0}`, %s)) BETWEEN %s AND %s".format(field), [ConditionFunctions.format_path(path), a, b]
 
     @staticmethod
     def in_set(field, path, obj):
