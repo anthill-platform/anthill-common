@@ -9,7 +9,7 @@ DEPENDENCIES = [
     "tornado==5.1.1",
     "pycryptodome==3.6.6",
     "mysql-connector-python==8.0.12",
-    "GitPython==2.1.7",
+    "GitPython==3.1.1",
     "Sphinx==1.8.1",
     "pyOpenSSL==18.0.0",
     "cffi==1.11.5",
