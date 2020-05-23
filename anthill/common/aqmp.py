@@ -1092,15 +1092,8 @@ class AMQPConsumer(AMQPObject):
             self._consumer_tag = consumer_tag
             log.debug('Consumer tag is %s', self._consumer_tag)
 
-    # noinspection PyUnusedLocal
-    async def cancel(self, nowait=False, timeout=None):
-        log = self._get_log('cancel')
-
-        log.debug('Cancelling consumer of queue %s', self._queue.routing_key)
-        await Task(self._channel.basic_cancel, consumer_tag=self._consumer_tag_given, nowait=nowait)
-
-        self._consumer_tag = None
-        log.debug('Consumer is cancelled')
+    def cancel(self):
+        return self._channel.basic_cancel(consumer_tag=self._consumer_tag_given)
 
 
 class TimeoutError(Exception):

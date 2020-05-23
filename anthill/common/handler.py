@@ -345,6 +345,8 @@ class AuthenticatedWSHandler(JsonHandlerMixin, AuthenticatedHandlerMixin,
             self.close(400, e.message)
         except HTTPError as e:
             self.close(e.status_code, e.reason)
+        except jsonrpc.JsonRPCError as e:
+            self.close(e.code, "An error occurred while opening the session")
         except BaseException as e:
             self.close(500, str(e))
 

@@ -12,7 +12,7 @@ class Publisher(object):
     def __init__(self):
         pass
 
-    async def publish(self, channel, payload):
+    async def publish(self, channel, payload, routing_key=''):
         raise NotImplementedError()
 
     async def release(self):
@@ -38,10 +38,10 @@ class Subscriber(object):
     async def start(self):
         pass
 
-    async def on_channel_handled(self, channel_name):
+    async def on_channel_handled(self, channel_name, routing_key=None):
         logging.info("Listening for channel '{0}'.".format(channel_name))
 
-    async def handle(self, channel, handler):
+    async def handle(self, channel, handler, routing_key=None):
         existing_handlers = self.handlers.get(channel, None)
 
         if existing_handlers is not None:
@@ -49,7 +49,7 @@ class Subscriber(object):
             return
 
         self.handlers[channel] = [handler]
-        await self.on_channel_handled(channel)
+        await self.on_channel_handled(channel, routing_key=routing_key)
 
 
 EXCHANGE_PREFIX = "pub_"
@@ -58,7 +58,7 @@ QUEUE_PREFIX = "sub_"
 
 class RabbitMQSubscriber(Subscriber):
 
-    def __init__(self, broker, name=None, **settings):
+    def __init__(self, broker, name=None, round_robin=True, **settings):
         super(RabbitMQSubscriber, self).__init__()
 
         self.broker = broker
@@ -68,6 +68,7 @@ class RabbitMQSubscriber(Subscriber):
         self.queue = None
         self.consumer = None
         self.name = name or "*"
+        self.round_robin = round_robin
         self.channel = None
 
     def __on_message__(self, channel, method, properties, body):
@@ -91,15 +92,17 @@ class RabbitMQSubscriber(Subscriber):
         channel.basic_ack(delivery_tag=method.delivery_tag)
 
     async def release(self):
+        if self.queue:
+            await self.queue.delete()
         self.connection.close()
 
-    async def on_channel_handled(self, channel_name):
+    async def on_channel_handled(self, channel_name, routing_key=None):
         await self.channel.exchange(
             exchange=EXCHANGE_PREFIX + channel_name,
-            exchange_type='fanout')
+            exchange_type='direct' if routing_key else 'fanout')
 
-        await self.queue.bind(exchange=EXCHANGE_PREFIX + channel_name)
-        await super(RabbitMQSubscriber, self).on_channel_handled(channel_name)
+        await self.queue.bind(exchange=EXCHANGE_PREFIX + channel_name, routing_key=routing_key)
+        await super(RabbitMQSubscriber, self).on_channel_handled(channel_name, routing_key=routing_key)
 
     async def start(self):
 
@@ -110,7 +113,11 @@ class RabbitMQSubscriber(Subscriber):
         await self.connection.wait_connect()
 
         self.channel = await self.connection.channel(prefetch_count=self.settings.get("channel_prefetch_count", 1024))
-        self.queue = await self.channel.queue(queue=QUEUE_PREFIX + self.name, auto_delete=True)
+
+        if self.round_robin:
+            self.queue = await self.channel.queue(queue=QUEUE_PREFIX + self.name, auto_delete=True)
+        else:
+            self.queue = await self.channel.queue(exclusive=True)
 
         self.consumer = await self.queue.consume(
             consumer_callback=self.__on_message__,
@@ -130,13 +137,7 @@ class RabbitMQPublisher(Publisher):
         self.exchanges = set()
         self.name = name
 
-    async def publish(self, channel, payload):
-
-        if channel not in self.exchanges:
-            await self.channel.exchange(
-                exchange=EXCHANGE_PREFIX + channel,
-                exchange_type='fanout')
-            self.exchanges.add(channel)
+    async def publish(self, channel, payload, routing_key=''):
 
         body = ujson.dumps(payload)
 
@@ -145,7 +146,7 @@ class RabbitMQPublisher(Publisher):
         try:
             self.channel.basic_publish(
                 exchange=EXCHANGE_PREFIX + channel,
-                routing_key='',
+                routing_key=routing_key,
                 body=body)
         except ChannelClosed:
             logging.info("Channel '{0}' closed.".format(channel))

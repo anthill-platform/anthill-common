@@ -286,6 +286,17 @@ class Server(tornado.web.Application):
         await self.subscriber.start()
         return self.subscriber
 
+    @staticmethod
+    async def acquire_custom_subscriber(name, round_robin=True):
+        subscriber = pubsub.RabbitMQSubscriber(
+            name=name,
+            round_robin=round_robin,
+            broker=options.pubsub,
+            channel_prefetch_count=options.internal_channel_prefetch_count)
+
+        await subscriber.start()
+        return subscriber
+
     async def acquire_publisher(self):
         if self.publisher is not None:
             return self.publisher
@@ -298,6 +309,29 @@ class Server(tornado.web.Application):
         await self.publisher.start()
         return self.publisher
 
+    @staticmethod
+    async def acquire_custom_publisher(name):
+        publisher = pubsub.RabbitMQPublisher(
+            broker=options.pubsub,
+            name=name,
+            channel_prefetch_count=options.internal_channel_prefetch_count)
+
+        await publisher.start()
+        return publisher
+
+    async def models_started(self):
+        need_account_delete_event = False
+        for model in self.get_models():
+            if hasattr(model, "started"):
+                try:
+                    await model.started(self)
+                except Exception as e:
+                    logging.exception("An error occured while starting model {0}".format(str(model)))
+                    tornado.ioloop.IOLoop.instance().stop()
+            if model.has_delete_account_event():
+                need_account_delete_event = True
+        return need_account_delete_event
+
     async def started(self):
         self.name = options.name
         self.token_cache = self.create_token_cache()
@@ -308,13 +342,7 @@ class Server(tornado.web.Application):
         internal_ = internal.Internal()
         await internal_.listen(self.name, self.__on_internal_receive__)
 
-        need_account_delete_event = False
-
-        for model in self.get_models():
-            if hasattr(model, "started"):
-                await model.started(self)
-            if model.has_delete_account_event():
-                need_account_delete_event = True
+        need_account_delete_event = await self.models_started()
 
         if need_account_delete_event:
             subscriber = await self.acquire_subscriber()

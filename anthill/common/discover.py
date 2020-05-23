@@ -71,6 +71,34 @@ class Discovery(object, metaclass=singleton.Singleton):
 
         return response
 
+    async def get_service_external(self, service_id):
+        record_id = "external:" + service_id
+
+        if record_id in self.services:
+            return self.services[record_id]
+
+        if self.discovery_service is None:
+            raise DiscoveryError(400, "Cannon fetch discovery service because it's None")
+
+        try:
+            response = await self.internal.get(
+                self.discovery_service,
+                "service/" + service_id, {},
+                use_json=False,
+                discover_service=False)
+
+        except internal.InternalError as e:
+            if e.code == 404:
+                raise DiscoveryError(404, "No such service")
+            elif e.code == 502:
+                raise DiscoveryError(502, "Service is down")
+            else:
+                raise DiscoveryError(e.code, "Discovery error: {0}.".format(e.body))
+
+        self.services[record_id] = response
+
+        return response
+
     def location(self):
         return self.discovery_service
 
