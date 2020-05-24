@@ -1,5 +1,5 @@
 
-from setuptools import setup, find_packages
+from setuptools import setup, find_namespace_packages
 
 DEPENDENCIES = [
     "ipaddress==1.0.22",
@@ -18,7 +18,7 @@ DEPENDENCIES = [
     "python-geoip-python3==1.3",
     # get the latest available
     "python-geoip-geolite2-yplan",
-    "psutil==5.4.7",
+    "psutil==5.6.6",
     "lazy==1.3",
     "pympler==0.6",
     "sprockets-influxdb==2.2.0",
@@ -31,19 +31,18 @@ DEPENDENCIES = [
 
 setup(
     name='anthill-common',
+    version='0.2.4',
     package_data={
       "anthill.common": ["anthill/common/sql", "anthill/common/static"]
     },
-    setup_requires=["pypigit-version"],
-    git_version="0.1.0",
-    description='Common utils for Anthill platform',
+    description='Common utils for Anthill Platform',
     author='desertkun',
     license='MIT',
     author_email='desertkun@gmail.com',
     url='https://github.com/anthill-platform/anthill-common',
     namespace_packages=["anthill"],
     include_package_data=True,
-    packages=find_packages(),
+    packages=find_namespace_packages(include=["anthill.*"]),
     zip_safe=False,
     install_requires=DEPENDENCIES
 )

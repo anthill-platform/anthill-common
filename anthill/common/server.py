@@ -28,9 +28,11 @@ import os
 from pympler import tracker
 import inspect
 
-# just included to define things
 # noinspection PyUnresolvedReferences
-from .options import default as opts_
+# just included to define default things.
+# Can be supressed by doing os.environ["NODEFAULTOPS"] = "1" before including this file
+if "NODEFAULTOPS" not in os.environ:
+    from .options import default as opts_
 
 from . import ElapsedTime
 
@@ -91,7 +93,7 @@ class Server(tornado.web.Application):
         if auth_callback:
             handlers.append((r"/auth_callback", auth_callback))
 
-        if options.serve_static:
+        if "serve_static" in options and options.serve_static:
             handlers.append((r'/static/(.*)', tornado.web.StaticFileHandler,
                              {'path': Server.module_path('static'), "default_filename": "index.html"}))
 
@@ -109,7 +111,7 @@ class Server(tornado.web.Application):
             handlers=handlers, debug=self.debug_mode
         )
 
-        if options.enable_monitoring:
+        if "enable-monitoring" in options and options.enable_monitoring:
             self.monitoring = monitoring.InfluxDBMonitoring(
                 host=options.monitoring_host,
                 port=options.monitoring_port,

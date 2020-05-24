@@ -29,8 +29,8 @@ class Internal(rabbitrpc.RabbitMQJsonRPC, metaclass=singleton.Singleton):
         self.internal_locations = [
             ipaddress.ip_network(network, False)
             for network in options.internal_restrict
-        ]
-        self.broker = options.internal_broker
+        ] if "internal-restrict" in options else []
+        self.broker = options.internal_broker if "internal-broker" in options else None
 
         super(Internal, self).__init__()
 
