@@ -15,13 +15,10 @@ DEPENDENCIES = [
     "cffi==1.11.5",
     "cryptography==2.3.1",
     "expiringdict==1.1.4",
-    "python-geoip-python3==1.3",
-    # get the latest available
-    "python-geoip-geolite2-yplan",
     "psutil==5.6.6",
     "lazy==1.3",
     "pympler==0.6",
-    "sprockets-influxdb==2.2.0",
+    "sprockets-influxdb==2.2.1",
     "aioredis==1.1.0",
     "pika==0.12.0",
     "anthill-PyMySQL==0.9.999",
@@ -31,7 +28,7 @@ DEPENDENCIES = [
 
 setup(
     name='anthill-common',
-    version='0.2.4',
+    version='0.2.5',
     package_data={
       "anthill.common": ["anthill/common/sql", "anthill/common/static"]
     },

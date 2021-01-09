@@ -1092,8 +1092,11 @@ class AMQPConsumer(AMQPObject):
             self._consumer_tag = consumer_tag
             log.debug('Consumer tag is %s', self._consumer_tag)
 
-    def cancel(self):
-        return self._channel.basic_cancel(consumer_tag=self._consumer_tag_given)
+    async def cancel(self):
+        if self._consumer_tag is None:
+            return
+        await self._channel.basic_cancel(consumer_tag=self._consumer_tag)
+        self._consumer_tag = None
 
 
 class TimeoutError(Exception):
