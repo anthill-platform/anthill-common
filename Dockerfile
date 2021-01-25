@@ -1,4 +1,4 @@
-FROM python:3.7-slim
+FROM python:3.7
 MAINTAINER desertkun
 RUN apt-get update && apt-get install -y python3-dev libssl-dev libffi-dev musl-dev make gcc g++ libzmq5 libzmq3-dev curl libtool autoconf automake
 WORKDIR /tmp
