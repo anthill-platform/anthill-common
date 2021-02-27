@@ -14,7 +14,7 @@ DEPENDENCIES = [
     "Sphinx==3.4.3",
     "pyOpenSSL==18.0.0",
     "cffi==1.14.4",
-    "cryptography==2.3.1",
+    "cryptography==3.3.2",
     "expiringdict==1.1.4",
     "psutil==5.6.6",
     "lazy==1.3",
