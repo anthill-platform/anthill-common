@@ -10,16 +10,17 @@ DEPENDENCIES = [
     "pycryptodome==3.6.6",
     "mysql-connector-python==8.0.12",
     "GitPython==3.1.1",
-    "Sphinx==1.8.1",
+    "idna==2.9",
+    "Sphinx==3.4.3",
     "pyOpenSSL==18.0.0",
-    "cffi==1.11.5",
+    "cffi==1.14.4",
     "cryptography==2.3.1",
     "expiringdict==1.1.4",
     "psutil==5.6.6",
     "lazy==1.3",
-    "pympler==0.6",
+    "pympler==0.9",
     "sprockets-influxdb==2.2.1",
-    "aioredis==1.1.0",
+    "aioredis==1.3.1",
     "pika==0.12.0",
     "anthill-PyMySQL==0.9.999",
     "anthill-tormysql==0.4.0",
@@ -28,7 +29,7 @@ DEPENDENCIES = [
 
 setup(
     name='anthill-common',
-    version='0.2.5',
+    version='0.2.6',
     package_data={
       "anthill.common": ["anthill/common/sql", "anthill/common/static"]
     },

@@ -142,6 +142,21 @@ def _load_json_dict_of_ints(field_name, field):
     }
 
 
+def _load_json_dict_of_primitives(field_name, field):
+    try:
+        field = ujson.loads(field)
+    except (TypeError, ValueError):
+        raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
+
+    if not isinstance(field, dict):
+        raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
+
+    return {
+        _str(name, name): _primitive(field_name + "." + name, value)
+        for name, value in field.items()
+    }
+
+
 def _json_dict(field_name, field):
     if not isinstance(field, dict):
         raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
@@ -192,6 +207,21 @@ def _json_dict_of_strings(field_name, field):
 
     return {
         _str(name, name): _str(field_name + "." + name, value)
+        for name, value in field.items()
+    }
+
+
+def _json_dict_of_primitives(field_name, field):
+    try:
+        ujson.dumps(field)
+    except (TypeError, ValueError):
+        raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
+
+    if not isinstance(field, dict):
+        raise ValidationError("Field {0} is not a valid JSON object".format(field_name))
+
+    return {
+        _str(name, name): _primitive(field_name + "." + name, value)
         for name, value in field.items()
     }
 
@@ -296,6 +326,16 @@ def _str(field_name, field):
     return field
 
 
+def _primitive(field_name, field):
+    try:
+        return int(field)
+    except (TypeError, ValueError):
+        if isinstance(field, str):
+            if _str_name_pattern.match(field):
+                return field
+        raise ValidationError("Field {0} is not a valid int or str_name".format(field_name))
+
+
 def _bytes(field_name, field):
     if not isinstance(field, bytes):
         raise ValidationError("Field {0} is not bytes".format(field_name))
@@ -347,6 +387,7 @@ VALIDATORS = {
     "json_list": _json_list,
     "json_dict_of_ints": _json_dict_of_ints,
     "json_dict_of_strings": _json_dict_of_strings,
+    "json_dict_of_primitives": _json_dict_of_primitives,
     "json_dict_of_dicts": _json_dict_of_dicts,
     "json_list_of_strings": _json_list_of_strings,
     "json_list_of_str_name": _json_list_of_str_name,
@@ -363,5 +404,6 @@ VALIDATORS = {
     "bool": _bool,
     "load_json": _load_json,
     "load_json_dict": _load_json_dict,
-    "load_json_dict_of_ints": _load_json_dict_of_ints
+    "load_json_dict_of_ints": _load_json_dict_of_ints,
+    "load_json_dict_of_primitives": _load_json_dict_of_primitives
 }
