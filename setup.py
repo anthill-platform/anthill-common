@@ -24,7 +24,7 @@ DEPENDENCIES = [
     "pika==0.12.0",
     "anthill-PyMySQL==0.9.999",
     "anthill-tormysql==0.4.0",
-    "PyJWT==1.6.4"
+    "PyJWT==2.4.0"
 ]
 
 setup(
