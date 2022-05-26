@@ -3,7 +3,7 @@ from setuptools import setup, find_namespace_packages
 
 DEPENDENCIES = [
     "ipaddress==1.0.22",
-    "ujson==1.35",
+    "ujson==5.2.0",
     "pyzmq==17.1.2",
     "redis==2.10.6",
     "tornado==5.1.1",
