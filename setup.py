@@ -8,7 +8,7 @@ DEPENDENCIES = [
     "redis==2.10.6",
     "tornado==5.1.1",
     "pycryptodome==3.6.6",
-    "mysql-connector-python==8.0.12",
+    "mysql-connector-python==8.0.14",
     "GitPython==3.1.1",
     "idna==2.9",
     "Sphinx==3.4.3",
